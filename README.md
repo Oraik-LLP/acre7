@@ -1,6 +1,21 @@
-# vinext-starter
+# Acre7
 
-A clean full-stack starter running on [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and Drizzle support.
+![Acre7 logo](<assets/Respawn%282%29.jpg>)
+
+Acre7 is a floor-plan-to-spatial-visualization workspace for showing how a real home can look before the walls are finished. The current build includes the designer, material presets, viewpoint map, panorama viewer, and the public product pages.
+
+## Local setup
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173/` for the public homepage. The main product surfaces are `/designer`, `/materials`, `/viewpoints`, `/about`, and `/plan`.
+
+The three Respawn logo variants are kept in [`assets/`](assets/). The future product scope and deferred work are recorded in [`docs/acre7-future-todos.md`](docs/acre7-future-todos.md).
+
+Acre7 runs on [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and Drizzle support.
 
 ## Prerequisites
 
