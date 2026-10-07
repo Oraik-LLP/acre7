@@ -488,3 +488,80 @@ html[data-theme="light"] .app-shell .theme-toggle { border-color: #c8d2c6; color
 }
 .brand { text-decoration: none; }
 .brand:focus-visible { border-radius: 5px; outline: 2px solid #d8fa75; outline-offset: 4px; }
+.site-nav { gap: 3px; padding: 5px; border: 1px solid rgba(197, 211, 191, .2); border-radius: 999px; background: rgba(22, 31, 25, .84); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 12px 32px rgba(0, 0, 0, .16); backdrop-filter: blur(18px) saturate(135%); }
+.site-nav-link { padding: 9px 13px; border-radius: 999px; transition: color .18s ease, background-color .18s ease; }
+.site-nav-link::after { display: none; }
+.site-nav-link:hover, .site-nav-link:focus-visible { border-radius: 999px; background: rgba(255, 255, 255, .07); outline: none; }
+.site-nav-link.active { border-radius: 999px; background: rgba(216, 250, 117, .12); }
+.site-nav-cta { border-radius: 999px; padding-inline: 17px; box-shadow: 0 5px 16px rgba(150, 183, 71, .16); }
+.site-nav-cta:focus-visible { outline: 2px solid #a6c94d; outline-offset: 3px; }
+
+.about-hero-aside { display: grid; align-self: end; gap: 31px; min-width: 0; }
+.about-spatial-demo { position: relative; overflow: hidden; padding: 14px 13px 11px; border: 1px solid rgba(180, 201, 168, .2); border-radius: 24px; color: #c5d2bf; background: radial-gradient(ellipse at 77% 34%, rgba(190, 224, 141, .13), transparent 43%), linear-gradient(145deg, #1b281f, #131a15 76%); box-shadow: 0 20px 48px rgba(0, 0, 0, .16), inset 0 1px 0 rgba(255, 255, 255, .08); }
+.about-spatial-demo::before { position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(145deg, rgba(255, 255, 255, .075), transparent 42%); content: ""; pointer-events: none; }
+.about-spatial-demo-header, .about-spatial-demo-footer { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.about-spatial-demo-header { color: #cbd7c6; font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+.about-spatial-demo-header > span:first-child { display: inline-flex; align-items: center; gap: 7px; }
+.about-spatial-demo-header i { width: 6px; height: 6px; border-radius: 50%; background: #c8ed55; box-shadow: 0 0 0 4px rgba(200, 237, 85, .12); }
+.about-spatial-illustration { position: relative; display: block; width: 100%; height: auto; margin: 5px 0 1px; overflow: visible; }
+.about-mini-plan-surface { fill: rgba(228, 239, 218, .035); stroke: rgba(194, 211, 185, .34); stroke-width: 1; }
+.about-mini-plan-grid { color: #9aaf96; opacity: .55; }
+.about-mini-plan-outline { fill: none; stroke: #becbbc; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+.about-mini-plan-route, .about-plan-to-room { fill: none; stroke: #c8ed55; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5; stroke-dasharray: 4 4; animation: about-route-flow 2.8s linear infinite; }
+.about-mini-plan-pin, .about-mini-room-marker { fill: #c8ed55; stroke: #f1f7e8; stroke-width: 1.5; }
+.about-plan-to-room { stroke-width: 1.7; }
+.about-plan-to-room-arrow { fill: none; stroke: #c8ed55; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5; }
+.about-mini-room-build { transform-box: fill-box; transform-origin: 50% 100%; animation: about-room-arrive .9s cubic-bezier(.2, .75, .25, 1) both; }
+.about-mini-room-shadow { fill: rgba(0, 0, 0, .28); filter: blur(4px); }
+.about-mini-room-floor { fill: url(#about-room-floor); stroke: #a8b69e; stroke-width: 1.2; }
+.about-mini-room-wall-left { fill: url(#about-room-wall-left); stroke: #9eae98; stroke-width: 1.2; }
+.about-mini-room-wall-right { fill: url(#about-room-wall-right); stroke: #9eae98; stroke-width: 1.2; }
+.about-mini-room-window { fill: #b8d1d0; fill-opacity: .72; stroke: #829e9a; stroke-width: 1.2; }
+.about-mini-room-rug { fill: #b3c68e; fill-opacity: .7; stroke: #859a70; stroke-width: 1; }
+.about-mini-room-furniture { fill: #8c765b; stroke: #725f4b; stroke-width: 1; }
+.about-mini-room-furniture-side { fill: #735f4a; stroke: #725f4b; stroke-width: 1; }
+.about-mini-room-furniture-front { fill: #9c8262; stroke: #725f4b; stroke-width: 1; }
+.about-mini-room-detail { fill: none; stroke: #8c9c83; stroke-linecap: round; stroke-width: 1; }
+.about-mini-room-marker { transform-box: fill-box; transform-origin: center; animation: about-marker-pulse 2.5s ease-out infinite; }
+.about-mini-label { fill: #99a894; font-size: 8px; font-weight: 750; letter-spacing: 1.3px; }
+.about-spatial-demo-footer { color: #899889; font-size: 8px; letter-spacing: .025em; }
+.about-spatial-demo-connector { position: relative; flex: 1; max-width: 40px; height: 1px; background: linear-gradient(90deg, rgba(200, 237, 85, .8), rgba(200, 237, 85, .12)); }
+.about-spatial-demo-connector::after { position: absolute; top: -2px; right: 0; width: 5px; height: 5px; border-top: 1px solid #c8ed55; border-right: 1px solid #c8ed55; content: ""; transform: rotate(45deg); }
+.about-hero-note { border-color: rgba(196, 211, 190, .28); }
+
+html[data-theme="light"] .site-nav { border-color: rgba(191, 202, 185, .8); background: rgba(251, 250, 245, .9); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .96), 0 12px 32px rgba(40, 54, 38, .1); }
+html[data-theme="light"] .site-nav-link:hover, html[data-theme="light"] .site-nav-link:focus-visible { background: rgba(102, 133, 54, .09); }
+html[data-theme="light"] .site-nav-link.active { background: rgba(200, 237, 85, .22); }
+html[data-theme="light"] .about-spatial-demo { border-color: #d7dfd1; color: #617260; background: radial-gradient(ellipse at 77% 34%, rgba(190, 224, 141, .3), transparent 43%), linear-gradient(145deg, #fffefa, #edf1e8 76%); box-shadow: 0 20px 48px rgba(43, 59, 41, .1), inset 0 1px 0 rgba(255, 255, 255, .9); }
+html[data-theme="light"] .about-spatial-demo::before { background: linear-gradient(145deg, rgba(255, 255, 255, .8), transparent 42%); }
+html[data-theme="light"] .about-spatial-demo-header { color: #536452; }
+html[data-theme="light"] .about-mini-plan-surface { fill: rgba(255, 255, 255, .54); stroke: #cbd7c4; }
+html[data-theme="light"] .about-mini-plan-grid { color: #8aa080; opacity: .54; }
+html[data-theme="light"] .about-mini-plan-outline { stroke: #83947f; }
+html[data-theme="light"] .about-mini-room-shadow { fill: rgba(46, 62, 44, .14); }
+html[data-theme="light"] .about-mini-room-floor { stroke: #9ead95; }
+html[data-theme="light"] .about-mini-room-wall-left, html[data-theme="light"] .about-mini-room-wall-right { stroke: #92a28c; }
+html[data-theme="light"] .about-mini-room-window { fill: #b4d5d7; stroke: #88a7a6; }
+html[data-theme="light"] .about-mini-label { fill: #657866; }
+html[data-theme="light"] .about-spatial-demo-footer { color: #708071; }
+html[data-theme="light"] .about-hero-note { border-color: #cfd9cb; }
+
+@keyframes about-route-flow { to { stroke-dashoffset: -16; } }
+@keyframes about-room-arrive { from { opacity: .15; transform: translateY(7px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes about-marker-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .58; } }
+
+@media (max-width: 700px) {
+  .site-nav { top: calc(100% + 8px); right: 0; left: auto; width: min(340px, calc(100vw - 32px)); max-height: min(70dvh, 460px); overflow-y: auto; gap: 4px; padding: 8px; border: 1px solid rgba(197, 211, 191, .24); border-radius: 23px; background: rgba(20, 29, 23, .96); box-shadow: 0 26px 68px rgba(0, 0, 0, .3), inset 0 1px 0 rgba(255, 255, 255, .09); backdrop-filter: blur(24px) saturate(140%); }
+  .site-nav.is-open { animation: site-nav-arrive .2s ease-out both; }
+  .site-nav-link { min-height: 46px; padding: 12px 14px; border-radius: 15px; }
+  .site-nav-link:hover, .site-nav-link:focus-visible, .site-nav-link.active { border-radius: 15px; }
+  .site-nav-cta { min-height: 46px; margin-top: 4px; border-radius: 15px; }
+  html[data-theme="light"] .site-nav { border-color: #d8e0d4; background: rgba(251, 250, 245, .97); box-shadow: 0 24px 60px rgba(40, 54, 38, .17), inset 0 1px 0 #fff; }
+  .about-hero-aside { gap: 25px; margin-top: 42px; }
+  .about-hero-aside .about-hero-note { margin-top: 0; }
+  .about-spatial-demo { max-width: 440px; }
+}
+@keyframes site-nav-arrive { from { opacity: 0; transform: translateY(-5px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .about-mini-plan-route, .about-plan-to-room, .about-mini-room-build, .about-mini-room-marker, .site-nav.is-open { animation: none; }
+}

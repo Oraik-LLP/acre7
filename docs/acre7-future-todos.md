@@ -32,6 +32,16 @@ For a later individual-panorama workflow, detect furniture, carpets, fixtures, a
 - Keep the brand treatment consistent across the homepage, designer, materials, viewpoints, about page, and future admin/session surfaces.
 - Preserve the current demo as the reference behavior while the production generation, token, and object-selection systems are built later.
 
+## Internal work queue notes
+
+These are planning reminders for the team and are intentionally not part of the public MVP interface:
+
+- Confirm extracted room layouts before generating a visualization.
+- Lock the material direction for each approved design.
+- Generate high-resolution panoramas at a strict 2:1 aspect ratio.
+- Calibrate viewpoint headings against the floor plan.
+- Treat shared depth and room-to-room travel as future spatial work.
+
 ## Deferred implementation checklist
 
 - [ ] Apply the Respawn logo system across the full site.

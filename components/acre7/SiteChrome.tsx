@@ -8,7 +8,6 @@ import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/acre7/ThemeToggle";
 
 const navItems = [
-  { href: "/designer", label: "Designer" },
   { href: "/materials", label: "Materials" },
   { href: "/viewpoints", label: "Viewpoints" },
   { href: "/about", label: "About" },
@@ -24,7 +23,7 @@ export function SiteHeader() {
     </Link>
     <nav className={open ? "site-nav is-open" : "site-nav"} aria-label="Primary navigation">
       {navItems.map((item) => {
-        const active = pathname === item.href || (item.href === "/designer" && pathname === "/plan");
+        const active = pathname === item.href;
         return <Link key={item.href} href={item.href} className={active ? "site-nav-link active" : "site-nav-link"} aria-current={active ? "page" : undefined} onClick={() => setOpen(false)}>{item.label}</Link>;
       })}
       <Link className="site-nav-cta" href="/designer" onClick={() => setOpen(false)}>Open designer <ArrowUpRight size={15} /></Link>
