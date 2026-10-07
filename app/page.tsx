@@ -135,7 +135,7 @@ export function DesignerApp() {
   return (
     <main id="main-content" className={`app-shell screen-${screen}`}>
       <header className="topbar">
-        <button className="brand" type="button" onClick={() => setScreen("source")} aria-label="Acre7 home"><span className="brand-mark"><NextImage src="/brand/acre7-mark.jpg" alt="" width={32} height={32} unoptimized /></span><span>acre<span className="brand-seven">7</span></span></button>
+        <Link className="brand" href="/" aria-label="Acre7 home"><span className="brand-mark"><NextImage src="/brand/acre7-mark.jpg" alt="" width={32} height={32} unoptimized /></span><span>acre<span className="brand-seven">7</span></span></Link>
         <div className="project-title"><span className="project-kicker">{screen === "source" ? "New project" : "Cedar House"}</span><span className="autosave"><span /> {screen === "source" ? "Plan review" : "Prepared demo"}</span></div>
         <div className="topbar-actions">
           <div className={screen === "source" ? "provider-state" : "provider-state project-ready"}>

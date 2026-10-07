@@ -486,3 +486,5 @@ html[data-theme="light"] .app-shell .theme-toggle { border-color: #c8d2c6; color
   html[data-theme="light"] .story-kicker { color: #657568; }
   html[data-theme="light"] .story-step-count { color: #718074; }
 }
+.brand { text-decoration: none; }
+.brand:focus-visible { border-radius: 5px; outline: 2px solid #d8fa75; outline-offset: 4px; }
