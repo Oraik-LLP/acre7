@@ -1,0 +1,14 @@
+.git
+.next
+.vinext
+.wrangler
+.sites-runtime
+dist
+node_modules
+outputs
+work
+.env*
+*.tsbuildinfo
+vid-assets
+assets
+docs

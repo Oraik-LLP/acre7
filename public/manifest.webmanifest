@@ -1,0 +1,12 @@
+{
+  "name": "Acre7",
+  "short_name": "Acre7",
+  "description": "Explore a home design from plan to panorama.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#101512",
+  "theme_color": "#101512",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

@@ -62,9 +62,9 @@ export default function MaterialsPage() {
   const group = materialGroups.find((item) => item.key === activeGroup) ?? materialGroups[0];
   const activeOption = group.options.find((option) => option.label === selections[activeGroup]) ?? group.options[0];
 
-  return <main className="site-page-shell">
+  return <main id="main-content" className="site-page-shell">
     <SiteHeader />
-    <main className="site-page materials-page">
+    <div className="site-page materials-page">
       <header className="page-intro materials-intro"><div><p className="home-kicker"><span className="home-kicker-line" /> Materials / controlled choices</p><h1>Set the atmosphere before the first render.</h1><p>Keep the palette deliberate. Acre7 carries these choices through the overhead view and every room-level panorama.</p></div><Link className="site-button primary" href="/designer">Use in designer <ArrowRight size={16} /></Link></header>
 
       <section className="materials-workspace" aria-label="Material selector">
@@ -81,7 +81,7 @@ export default function MaterialsPage() {
           <div className="materials-options" role="listbox" aria-label={group.label}>{group.options.map((option) => { const active = option.label === selections[activeGroup]; return <button type="button" role="option" aria-selected={active} className={active ? "materials-option active" : "materials-option"} key={option.label} onClick={() => setSelections((current) => ({ ...current, [activeGroup]: option.label }))}><span className="materials-option-swatch" style={{ background: option.swatch }} /><span><strong>{option.label}</strong><small>{option.detail}</small></span>{active && <Check size={16} />}</button>; })}</div>
         </div>
       </section>
-    </main>
+    </div>
     <SiteFooter />
   </main>;
 }

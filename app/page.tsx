@@ -130,13 +130,13 @@ export function DesignerApp() {
   const selected = viewpoints.find((viewpoint) => viewpoint.id === selectedViewpoint) ?? viewpoints[0];
 
   return (
-    <main className={`app-shell screen-${screen}`}>
+    <main id="main-content" className={`app-shell screen-${screen}`}>
       <header className="topbar">
         <button className="brand" type="button" onClick={() => setScreen("source")} aria-label="Acre7 home"><span className="brand-mark"><House size={17} strokeWidth={2.2} /></span><span>acre<span className="brand-seven">7</span></span></button>
-        <div className="project-title"><span className="project-kicker">{screen === "source" ? "Untitled project" : "Cedar House"}</span><span className="autosave"><span /> Draft saved locally</span></div>
+        <div className="project-title"><span className="project-kicker">{screen === "source" ? "New project" : "Cedar House"}</span><span className="autosave"><span /> {screen === "source" ? "Plan review" : "Prepared demo"}</span></div>
         <div className={screen === "source" ? "provider-state" : "provider-state project-ready"}>
-          <span className={screen !== "source" || (providers?.gemini && providers?.xai) ? "provider-dot ready" : "provider-dot"} />
-          <span>{screen !== "source" ? "Project ready" : providers?.gemini && providers?.xai ? "Providers ready" : "Setup required"}</span>
+          <span className={screen !== "source" || providers?.analysisEnabled ? "provider-dot ready" : "provider-dot"} />
+          <span>{screen !== "source" ? "Demo ready" : providers?.analysisEnabled ? "Plan reader ready" : "Demo mode"}</span>
         </div>
       </header>
 
@@ -150,7 +150,7 @@ export function DesignerApp() {
 
       {screen === "source" ? (
         <SourceWorkspace
-          file={file} preview={preview} analysis={analysis} analysisError={analysisError} isAnalyzing={isAnalyzing}
+          file={file} preview={preview} analysis={analysis} analysisError={analysisError} isAnalyzing={isAnalyzing} analysisEnabled={providers?.analysisEnabled ?? false}
           parameters={parameters} instructions={instructions}
           onFile={acceptFile} onInstructions={setInstructions} onPicker={setPicker} onAnalyze={analyze}
           onOpenReady={() => { setScreen("overview"); setAnalysisError(""); }}
@@ -181,7 +181,7 @@ export function DesignerApp() {
 }
 
 type SourceProps = {
-  file: File | null; preview: string | null; analysis: FloorPlanAnalysis | null; analysisError: string; isAnalyzing: boolean;
+  file: File | null; preview: string | null; analysis: FloorPlanAnalysis | null; analysisError: string; isAnalyzing: boolean; analysisEnabled: boolean;
   parameters: Record<ParameterKey, string>; instructions: string;
   onFile: (file?: File) => void; onInstructions: (value: string) => void; onPicker: (key: ParameterKey) => void;
   onAnalyze: () => void; onOpenReady: () => void;
@@ -206,17 +206,17 @@ function SourceWorkspace(props: SourceProps) {
         I want to generate this house with <Chip label={props.parameters.walls} onClick={() => props.onPicker("walls")} /> walls, <Chip label={props.parameters.flooring} onClick={() => props.onPicker("flooring")} /> flooring, a <Chip label={props.parameters.style} onClick={() => props.onPicker("style")} /> interior, and <Chip label={props.parameters.lighting} onClick={() => props.onPicker("lighting")} />.
       </div><textarea value={props.instructions} onChange={(event) => props.onInstructions(event.target.value)} maxLength={4000} aria-label="Additional instructions" placeholder="Add project details, room priorities, or finishes…" /></div>
       {props.analysisError && <div className="inline-alert" role="alert"><AlertTriangle size={17} /><span>{props.analysisError}</span></div>}
-      <Button className="primary-action" size="lg" disabled={!props.file || props.isAnalyzing} onClick={props.onAnalyze}>{props.isAnalyzing ? <><LoaderCircle className="spin" /> Reading plan…</> : <>Read floor plan <ArrowRight /></>}</Button>
-      {!props.file && <p className="action-note">Upload a plan to start a new project</p>}
+      <Button className="primary-action" size="lg" disabled={!props.file || props.isAnalyzing || !props.analysisEnabled} onClick={props.onAnalyze}>{props.isAnalyzing ? <><LoaderCircle className="spin" /> Reading plan…</> : <>Read floor plan <ArrowRight /></>}</Button>
+      {!props.analysisEnabled ? <p className="action-note">Live plan reading is not enabled here. Explore the prepared Cedar House tour above.</p> : !props.file && <p className="action-note">Upload a plan to start a new project</p>}
     </aside>
 
     <section className="canvas-panel" aria-label="Floor plan preview">
       <div className="canvas-toolbar"><div><span className="canvas-title">{props.analysis ? "Layout review" : "Floor plan"}</span><span className="canvas-status">{props.analysis ? `${props.analysis.rooms.length} rooms · ${props.analysis.openings.length} openings detected` : props.file ? "Ready to analyze" : "Waiting for upload"}</span></div><span className="resolution-pill">{props.analysis ? "Needs confirmation" : "Input source"}</span></div>
       <div className={props.preview ? "plan-canvas with-preview" : "plan-canvas"}>
         {props.preview ? <img src={props.preview} alt="Uploaded floor plan preview" /> : props.file ? <div className="pdf-preview"><FileImage size={34} /><strong>{props.file.name}</strong><span>PDF ready for page selection</span></div> : <EmptyPlan />}
-        {props.analysis && <div className="analysis-drawer"><div className="analysis-heading"><div><small>Floor plan extraction</small><strong>{props.analysis.projectSummary}</strong></div><span>{Math.round((props.analysis.rooms.reduce((sum, room) => sum + room.confidence, 0) / Math.max(props.analysis.rooms.length, 1)) * 100)}% avg. confidence</span></div><div className="room-list">{props.analysis.rooms.map((room) => <button type="button" key={room.id}><span>{room.label}</span><small>{Math.round(room.confidence * 100)}%</small></button>)}</div>{props.analysis.uncertainties.length > 0 && <div className="uncertainty"><AlertTriangle size={15} /><span>{props.analysis.uncertainties[0]}</span></div>}<Button className="confirm-layout">Confirm layout <ArrowRight /></Button></div>}
+        {props.analysis && <div className="analysis-drawer"><div className="analysis-heading"><div><small>Floor plan extraction</small><strong>{props.analysis.projectSummary}</strong></div><span>{Math.round((props.analysis.rooms.reduce((sum, room) => sum + room.confidence, 0) / Math.max(props.analysis.rooms.length, 1)) * 100)}% avg. confidence</span></div><div className="room-list">{props.analysis.rooms.map((room) => <div className="room-result" key={room.id}><span>{room.label}</span><small>{Math.round(room.confidence * 100)}%</small></div>)}</div>{props.analysis.uncertainties.length > 0 && <div className="uncertainty"><AlertTriangle size={15} /><span>{props.analysis.uncertainties[0]}</span></div>}<p className="analysis-next-note">This is the current live step. The Cedar House tour above is a prepared example.</p></div>}
       </div>
-      <div className="canvas-footer"><span>Nothing is generated until you confirm the extracted layout.</span><span className="provider-note">Gemini analysis · Grok panorama</span></div>
+      <div className="canvas-footer"><span>Review the extracted rooms and uncertainties before planning a visualization.</span><span className="provider-note">Gemini plan analysis · prepared panorama demo</span></div>
     </section>
   </section>;
 }
@@ -261,7 +261,7 @@ function Chip({ label, onClick }: { label: string; onClick: () => void }) {
 }
 
 export default function HomePage() {
-  return <main className="marketing-site">
+  return <main id="main-content" className="marketing-site">
     <SiteHeader />
 
     <section className="home-hero" aria-labelledby="home-title">

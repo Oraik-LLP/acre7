@@ -10,9 +10,9 @@ export default function ViewpointsPage() {
   const [selectedId, setSelectedId] = useState(viewpoints[0].id);
   const selected = viewpoints.find((viewpoint) => viewpoint.id === selectedId) ?? viewpoints[0];
 
-  return <main className="site-page-shell">
+  return <main id="main-content" className="site-page-shell">
     <SiteHeader />
-    <main className="site-page viewpoints-page">
+    <div className="site-page viewpoints-page">
       <header className="page-intro viewpoints-intro"><div><p className="home-kicker"><span className="home-kicker-line" /> Viewpoints / room positions</p><h1>Choose where the conversation happens.</h1><p>Use the plan as the map. Place a handful of positions where the material decision, circulation, or room feeling needs a closer look.</p></div><Link className="site-button primary" href="/designer">Open the full designer <ArrowUpRight size={16} /></Link></header>
 
       <section className="viewpoints-workspace" aria-label="Cedar House viewpoints">
@@ -21,7 +21,7 @@ export default function ViewpointsPage() {
       </section>
 
       <div className="viewpoints-list" role="list" aria-label="All viewpoints">{viewpoints.map((viewpoint) => <button type="button" key={viewpoint.id} className={viewpoint.id === selected.id ? "viewpoints-list-item active" : "viewpoints-list-item"} onClick={() => setSelectedId(viewpoint.id)} aria-pressed={viewpoint.id === selected.id}><span className="viewpoints-list-number">{String(viewpoint.index).padStart(2, "0")}</span><span><strong>{viewpoint.name}</strong><small>{viewpoint.roomLabel}</small></span><span className="viewpoints-list-arrow"><ArrowRight size={15} /></span></button>)}</div>
-    </main>
+    </div>
     <SiteFooter />
   </main>;
 }

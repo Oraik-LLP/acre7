@@ -2,7 +2,7 @@
 
 ![Acre7 logo](<assets/Respawn%282%29.jpg>)
 
-Acre7 is a floor-plan-to-spatial-visualization workspace for showing how a real home can look before the walls are finished. The current build includes the designer, material presets, viewpoint map, panorama viewer, and the public product pages.
+Acre7 is a floor-plan-to-spatial-visualization workspace for showing how a real home can look before the walls are finished. The current build includes the designer, material presets, viewpoint map, panorama viewer, and public product pages. The Cedar House tour is a prepared demo; live uploads currently return a structured floor-plan analysis.
 
 ## Local setup
 
@@ -15,7 +15,11 @@ Open `http://localhost:5173/` for the public homepage. The main product surfaces
 
 The three Respawn logo variants are kept in [`assets/`](assets/). The future product scope and deferred work are recorded in [`docs/acre7-future-todos.md`](docs/acre7-future-todos.md).
 
-Acre7 runs on [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and Drizzle support.
+## Deploy on Dokploy
+
+The repo includes a multi-stage [`Dockerfile`](Dockerfile) that runs a standalone Next.js server on port 3000. Use the `main` branch of `Oraik-LLP/acre7` as the source, then follow the [Dokploy and Cloudflare setup](docs/deployment.md) for the domain, environment variables, health endpoint, and release checks. The production server build can be checked locally with `npm run build:server`.
+
+Local development uses [vinext](https://github.com/cloudflare/vinext); the Dokploy container runs the standard Next.js standalone output. Optional Cloudflare D1 and Drizzle scaffolding remains in the repository.
 
 ## Prerequisites
 

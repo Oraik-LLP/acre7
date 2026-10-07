@@ -30,6 +30,7 @@ export type FloorPlanAnalysis = {
 export type ProviderStatus = {
   gemini: boolean;
   xai: boolean;
+  analysisEnabled: boolean;
   geminiModel: string;
   xaiImageModel: string;
 };
