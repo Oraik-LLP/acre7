@@ -4,9 +4,9 @@
   "description": "Explore a home design from plan to panorama.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#101512",
-  "theme_color": "#101512",
+  "background_color": "#f6f5ef",
+  "theme_color": "#f6f5ef",
   "icons": [
-    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "/brand/acre7-mark.jpg", "sizes": "2000x2000", "type": "image/jpeg", "purpose": "any maskable" }
   ]
 }

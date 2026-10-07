@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
+import NextImage from "next/image";
 import {
   AlertTriangle, ArrowLeft, ArrowRight, ArrowUpRight, Check, ChevronDown,
-  ChevronRight, CircleDot, FileImage, House, Layers3, LoaderCircle, MapPin,
+  ChevronRight, CircleDot, FileImage, Layers3, LoaderCircle, MapPin,
   Ruler, ScanLine, Sparkles, Upload, Waypoints,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,8 @@ import { demoViewpoints as viewpoints } from "@/lib/acre7/scene/viewpoints";
 import type { PanoramaMetadata, Viewpoint } from "@/lib/acre7/scene/types";
 import type { FloorPlanAnalysis, ProviderStatus } from "@/lib/acre7/types";
 import { SiteFooter, SiteHeader } from "@/components/acre7/SiteChrome";
+import { ThemeToggle } from "@/components/acre7/ThemeToggle";
+import { ScrollSpatialStory } from "@/components/acre7/ScrollSpatialStory";
 
 type ParameterKey = "walls" | "flooring" | "style" | "lighting";
 type Screen = "source" | "overview" | "tour";
@@ -132,11 +135,14 @@ export function DesignerApp() {
   return (
     <main id="main-content" className={`app-shell screen-${screen}`}>
       <header className="topbar">
-        <button className="brand" type="button" onClick={() => setScreen("source")} aria-label="Acre7 home"><span className="brand-mark"><House size={17} strokeWidth={2.2} /></span><span>acre<span className="brand-seven">7</span></span></button>
+        <button className="brand" type="button" onClick={() => setScreen("source")} aria-label="Acre7 home"><span className="brand-mark"><NextImage src="/brand/acre7-mark.jpg" alt="" width={32} height={32} unoptimized /></span><span>acre<span className="brand-seven">7</span></span></button>
         <div className="project-title"><span className="project-kicker">{screen === "source" ? "New project" : "Cedar House"}</span><span className="autosave"><span /> {screen === "source" ? "Plan review" : "Prepared demo"}</span></div>
-        <div className={screen === "source" ? "provider-state" : "provider-state project-ready"}>
-          <span className={screen !== "source" || providers?.analysisEnabled ? "provider-dot ready" : "provider-dot"} />
-          <span>{screen !== "source" ? "Demo ready" : providers?.analysisEnabled ? "Plan reader ready" : "Demo mode"}</span>
+        <div className="topbar-actions">
+          <div className={screen === "source" ? "provider-state" : "provider-state project-ready"}>
+            <span className={screen !== "source" || providers?.analysisEnabled ? "provider-dot ready" : "provider-dot"} />
+            <span>{screen !== "source" ? "Demo ready" : providers?.analysisEnabled ? "Plan reader ready" : "Demo mode"}</span>
+          </div>
+          <ThemeToggle />
         </div>
       </header>
 
@@ -213,7 +219,7 @@ function SourceWorkspace(props: SourceProps) {
     <section className="canvas-panel" aria-label="Floor plan preview">
       <div className="canvas-toolbar"><div><span className="canvas-title">{props.analysis ? "Layout review" : "Floor plan"}</span><span className="canvas-status">{props.analysis ? `${props.analysis.rooms.length} rooms · ${props.analysis.openings.length} openings detected` : props.file ? "Ready to analyze" : "Waiting for upload"}</span></div><span className="resolution-pill">{props.analysis ? "Needs confirmation" : "Input source"}</span></div>
       <div className={props.preview ? "plan-canvas with-preview" : "plan-canvas"}>
-        {props.preview ? <img src={props.preview} alt="Uploaded floor plan preview" /> : props.file ? <div className="pdf-preview"><FileImage size={34} /><strong>{props.file.name}</strong><span>PDF ready for page selection</span></div> : <EmptyPlan />}
+        {props.preview ? <NextImage src={props.preview} alt="Uploaded floor plan preview" width={1600} height={900} unoptimized /> : props.file ? <div className="pdf-preview"><FileImage size={34} /><strong>{props.file.name}</strong><span>PDF ready for page selection</span></div> : <EmptyPlan />}
         {props.analysis && <div className="analysis-drawer"><div className="analysis-heading"><div><small>Floor plan extraction</small><strong>{props.analysis.projectSummary}</strong></div><span>{Math.round((props.analysis.rooms.reduce((sum, room) => sum + room.confidence, 0) / Math.max(props.analysis.rooms.length, 1)) * 100)}% avg. confidence</span></div><div className="room-list">{props.analysis.rooms.map((room) => <div className="room-result" key={room.id}><span>{room.label}</span><small>{Math.round(room.confidence * 100)}%</small></div>)}</div>{props.analysis.uncertainties.length > 0 && <div className="uncertainty"><AlertTriangle size={15} /><span>{props.analysis.uncertainties[0]}</span></div>}<p className="analysis-next-note">This is the current live step. The Cedar House tour above is a prepared example.</p></div>}
       </div>
       <div className="canvas-footer"><span>Review the extracted rooms and uncertainties before planning a visualization.</span><span className="provider-note">Gemini plan analysis · prepared panorama demo</span></div>
@@ -241,7 +247,7 @@ function ReadyProject({ screen, selected, selectedViewpoint, isEntering, isPrepa
     <section className="canvas-panel project-canvas">
       <div className="canvas-toolbar"><div><span className="canvas-title">{screen === "tour" ? selected.name : "Furnished overview"}</span><span className="canvas-status">{screen === "tour" ? "360° panorama · drag, look up or down, and zoom" : "Choose a point to preview its room"}</span></div><span className="resolution-pill">{screen === "tour" ? panoramaMetadata ? `${panoramaMetadata.width} × ${panoramaMetadata.height}` : "Loading texture" : "5 viewpoints"}</span></div>
       {screen === "tour" ? <PanoramaViewer viewpoint={selected} viewpoints={viewpoints} onViewpointChange={onSelect} onMetadata={onMetadata} /> : <div className={isEntering ? "overview-canvas entering-tour" : "overview-canvas"} style={{ "--focus-x": `${selected.planPosition.x}%`, "--focus-y": `${selected.planPosition.y}%` } as CSSProperties}>
-        <img className="overhead-image" src="/demo/apartment-overhead.png" alt="Furnished overhead view of Cedar House" />
+        <NextImage className="overhead-image" src="/demo/apartment-overhead.png" alt="Furnished overhead view of Cedar House" width={1672} height={1000} unoptimized />
         <div className="transition-panorama" style={{ backgroundImage: `url(${selected.panoramaUrl})` }} />
         <div className="transition-label"><MapPin size={16} /><span>Entering {selected.name}</span></div>
         {viewpoints.map((viewpoint) => <button type="button" aria-label={`Open ${viewpoint.name}`} title={viewpoint.name} key={viewpoint.id} className={selectedViewpoint === viewpoint.id ? "map-point active" : "map-point"} style={{ left: `${viewpoint.planPosition.x}%`, top: `${viewpoint.planPosition.y}%` }} onClick={() => onSelect(viewpoint.id)} disabled={isEntering || isPreparing}><span>{viewpoint.index}</span></button>)}
@@ -281,11 +287,10 @@ export default function HomePage() {
       </div>
 
       <div className="home-hero-stage" aria-label="Acre7 spatial preview">
-        <div className="stage-meta"><span>CEDAR HOUSE / LIVE PREVIEW</span><span><span className="status-pip" /> 5 viewpoints ready</span></div>
+        <div className="stage-meta"><span>CEDAR HOUSE / SPATIAL STUDY</span><span><span className="status-pip" /> 5 viewpoints</span></div>
         <div className="stage-viewport">
           <div className="stage-grid" aria-hidden="true" />
           <div className="stage-plan" style={{ backgroundImage: "url('/demo/apartment-overhead.png')" }} role="img" aria-label="Furnished overhead view of Cedar House" />
-          <div className="stage-panorama" style={{ backgroundImage: "url('/demo/living-panorama.png')" }} role="img" aria-label="Living room panorama preview" />
           <span className="stage-line stage-line-one" aria-hidden="true" />
           <span className="stage-line stage-line-two" aria-hidden="true" />
           <span className="stage-pin stage-pin-one"><span>01</span><small>Living room</small></span>
@@ -296,6 +301,8 @@ export default function HomePage() {
         <div className="stage-footer"><span>Floor plan → spatial preview</span><span>Drag inside the designer to look around</span></div>
       </div>
     </section>
+
+    <ScrollSpatialStory />
 
     <section className="home-signal" aria-labelledby="signal-title">
       <div className="home-section-index">01 / THE SIGNAL</div>

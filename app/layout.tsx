@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import { ThemeProvider } from "@/components/acre7/ThemeProvider";
 import "./globals.css";
+import "./acre7-enhancements.css";
 
 export const metadata: Metadata = {
   title: "Acre7 — See the house before the walls are finished",
@@ -8,8 +10,8 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Acre7", statusBarStyle: "black-translucent" },
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: "/brand/acre7-mark.jpg",
+    shortcut: "/brand/acre7-mark.jpg",
   },
 };
 
@@ -17,7 +19,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#101512",
+  themeColor: "#f6f5ef",
 };
 
 export default function RootLayout({
@@ -26,8 +28,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-theme="dark">
-      <body className="antialiased"><a className="skip-link" href="#main-content">Skip to content</a>{children}</body>
+    <html lang="en" data-theme="light" suppressHydrationWarning>
+      <body className="antialiased">
+        <ThemeProvider>
+          <a className="skip-link" href="#main-content">Skip to content</a>
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
   );
 }
