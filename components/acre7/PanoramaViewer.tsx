@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, ChevronLeft, ChevronRight, LoaderCircle, MapPin, Maximize2, Minimize2, Move } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, LoaderCircle, MapPin, Maximize2, Minimize2, Move, Sparkles, X, RotateCcw, ImagePlus, WandSparkles } from "lucide-react";
 import * as THREE from "three";
+import Image from "next/image";
 import { isValidPanorama, validatePanorama } from "@/lib/acre7/scene/panorama";
 import { normalizeDegrees } from "@/lib/acre7/scene/coordinates";
 import type { PanoramaMetadata, Viewpoint } from "@/lib/acre7/scene/types";
+import { editableFurniture, selectedFurnitureChoice, type EditableFurniture } from "@/lib/acre7/furniture-demo";
 
 type ViewerStatus = "loading" | "ready" | "failed" | "webgl-unavailable";
 
@@ -14,6 +16,9 @@ type PanoramaViewerProps = {
   viewpoints: Viewpoint[];
   onViewpointChange: (viewpointId: string) => void;
   onMetadata: (metadata: PanoramaMetadata | null) => void;
+  panoramaUrl: string;
+  choice: string;
+  onChoiceChange: (choice: string, itemId?: string) => void;
 };
 
 type Orientation = {
@@ -53,14 +58,24 @@ function pointerDistance(points: Map<number, { x: number; y: number }>) {
   return Math.hypot(second.x - first.x, second.y - first.y);
 }
 
-export function PanoramaViewer({ viewpoint, viewpoints, onViewpointChange, onMetadata }: PanoramaViewerProps) {
+export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onChoiceChange, onViewpointChange, onMetadata }: PanoramaViewerProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const materialRef = useRef<THREE.MeshBasicMaterial | null>(null);
+  const overlayMaterialRef = useRef<THREE.MeshBasicMaterial | null>(null);
+  const overlayMeshRef = useRef<THREE.Mesh | null>(null);
+  const transitionRef = useRef<{ texture: THREE.Texture; started: number } | null>(null);
   const textureCacheRef = useRef(new Map<string, Promise<THREE.Texture>>());
   const hotspotRefs = useRef(new Map<string, HTMLButtonElement>());
+  const furnitureRefs = useRef(new Map<string, HTMLButtonElement>());
+  const shapeRefs = useRef(new Map<string, SVGPolygonElement>());
+  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressOriginRef = useRef<{ x: number; y: number } | null>(null);
+  const pressedItemRef = useRef<string | null>(null);
+  const editorRef = useRef<HTMLElement>(null);
+  const stickerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const viewpointRef = useRef(viewpoint);
   const mountedRef = useRef(false);
   const headingRef = useRef<HTMLSpanElement>(null);
@@ -78,6 +93,21 @@ export function PanoramaViewer({ viewpoint, viewpoints, onViewpointChange, onMet
   const [status, setStatus] = useState<ViewerStatus>("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [activeItem, setActiveItem] = useState<EditableFurniture | null>(null);
+  const [editTab, setEditTab] = useState<"suggest" | "inventory" | "reference" | "describe">("suggest");
+  const [description, setDescription] = useState("");
+  const [referenceName, setReferenceName] = useState("");
+  const [editMessage, setEditMessage] = useState("");
+  const [sticker, setSticker] = useState<{ image: string; points: string; width: number; height: number } | null>(null);
+  const items = editableFurniture[viewpoint.id] ?? [];
+  const isEmpty = choice === "empty";
+
+  useEffect(() => {
+    if (editing) editorRef.current?.focus({ preventScroll: true });
+  }, [editing]);
+
+  useEffect(() => () => { if (stickerTimerRef.current) clearTimeout(stickerTimerRef.current); }, []);
 
   useEffect(() => {
     const syncFullscreenState = () => {
@@ -90,6 +120,7 @@ export function PanoramaViewer({ viewpoint, viewpoints, onViewpointChange, onMet
 
   useEffect(() => {
     viewpointRef.current = viewpoint;
+    queueMicrotask(() => { setActiveItem(null); setEditing(false); setEditMessage(""); });
     const orientation = orientationRef.current;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     orientation.targetYaw = viewpoint.initialYaw;
@@ -109,7 +140,7 @@ export function PanoramaViewer({ viewpoint, viewpoints, onViewpointChange, onMet
     let renderer: THREE.WebGLRenderer;
 
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance", preserveDrawingBuffer: true });
     } catch {
       queueMicrotask(() => {
         setStatus("webgl-unavailable");
@@ -129,6 +160,13 @@ export function PanoramaViewer({ viewpoint, viewpoints, onViewpointChange, onMet
     const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const sphere = new THREE.Mesh(geometry, material);
     scene.add(sphere);
+    const overlayGeometry = geometry.clone();
+    overlayGeometry.scale(0.995, 0.995, 0.995);
+    const overlayMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthTest: false, depthWrite: false });
+    const overlaySphere = new THREE.Mesh(overlayGeometry, overlayMaterial);
+    overlaySphere.renderOrder = 1;
+    overlaySphere.visible = false;
+    scene.add(overlaySphere);
 
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -139,6 +177,8 @@ export function PanoramaViewer({ viewpoint, viewpoints, onViewpointChange, onMet
     rendererRef.current = renderer;
     cameraRef.current = camera;
     materialRef.current = material;
+    overlayMaterialRef.current = overlayMaterial;
+    overlayMeshRef.current = overlaySphere;
 
     const resize = () => {
       const { width, height } = viewport.getBoundingClientRect();
@@ -160,7 +200,7 @@ export function PanoramaViewer({ viewpoint, viewpoints, onViewpointChange, onMet
 
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as HTMLElement;
-      if (target.closest("button")) return;
+      if (target.closest("button, input, textarea, .furniture-editor")) return;
       event.preventDefault();
       viewport.focus({ preventScroll: true });
       viewport.setPointerCapture(event.pointerId);
@@ -233,6 +273,7 @@ export function PanoramaViewer({ viewpoint, viewpoints, onViewpointChange, onMet
     };
 
     const onWheel = (event: WheelEvent) => {
+      if ((event.target as HTMLElement).closest(".furniture-editor")) return;
       event.preventDefault();
       orientationRef.current.targetFov = clamp(
         orientationRef.current.targetFov + event.deltaY * 0.035,
@@ -242,6 +283,8 @@ export function PanoramaViewer({ viewpoint, viewpoints, onViewpointChange, onMet
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setEditing(false); return; }
+      if ((event.target as HTMLElement).closest("input, textarea")) return;
       const orientation = orientationRef.current;
       if (event.key === "ArrowLeft") orientation.targetYaw -= 12;
       else if (event.key === "ArrowRight") orientation.targetYaw += 12;
@@ -274,6 +317,18 @@ export function PanoramaViewer({ viewpoint, viewpoints, onViewpointChange, onMet
         camera.fov = orientation.fov;
         camera.updateProjectionMatrix();
       }
+      const transition = transitionRef.current;
+      if (transition) {
+        const progress = clamp((performance.now() - transition.started) / 420, 0, 1);
+        overlayMaterial.opacity = 1 - Math.pow(1 - progress, 3);
+        if (progress >= 1) {
+          material.map = transition.texture;
+          material.needsUpdate = true;
+          overlayMaterial.map = null;
+          overlaySphere.visible = false;
+          transitionRef.current = null;
+        }
+      }
 
       const normalizedYaw = normalizeDegrees(orientation.yaw);
       if (headingRef.current) headingRef.current.textContent = `${Math.round(normalizedYaw)}°`;
@@ -289,6 +344,36 @@ export function PanoramaViewer({ viewpoint, viewpoints, onViewpointChange, onMet
         element.style.top = `${vertical}%`;
         element.style.opacity = visible ? "1" : "0";
         element.style.pointerEvents = visible ? "auto" : "none";
+      });
+
+      const projectPoint = (bearing: number, pitch: number) => {
+        const longitude = THREE.MathUtils.degToRad(bearing);
+        const latitude = THREE.MathUtils.degToRad(pitch);
+        const point = new THREE.Vector3(Math.sin(longitude) * Math.cos(latitude), Math.sin(latitude), -Math.cos(longitude) * Math.cos(latitude)).multiplyScalar(10).project(camera);
+        return { x: (point.x + 1) * renderer.domElement.clientWidth / 2, y: (1 - point.y) * renderer.domElement.clientHeight / 2 };
+      };
+      const horizontalFov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(orientation.fov) / 2) * camera.aspect));
+      (editableFurniture[viewpointRef.current.id] ?? []).forEach((item) => {
+        const element = furnitureRefs.current.get(item.id);
+        const shape = shapeRefs.current.get(item.id);
+        if (!element && !shape) return;
+        const relativeBearing = normalizeDegrees(item.bearing - normalizedYaw);
+        const visible = Math.abs(relativeBearing) < horizontalFov * 0.55;
+        if (element) {
+          const center = projectPoint(item.bearing, item.pitch);
+          element.style.left = `${center.x}px`;
+          element.style.top = `${center.y}px`;
+          element.style.opacity = visible ? "1" : "0";
+          element.style.pointerEvents = visible ? "auto" : "none";
+        }
+        if (shape) {
+          shape.style.opacity = visible ? "1" : "0";
+          shape.style.pointerEvents = visible ? "visiblePainted" : "none";
+          if (visible) shape.setAttribute("points", item.outline.map(([x, y]) => {
+            const p = projectPoint((x / 1774) * 360 - 270, (0.5 - y / 887) * 180);
+            return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
+          }).join(" "));
+        }
       });
 
       renderer.render(scene, camera);
@@ -312,7 +397,9 @@ export function PanoramaViewer({ viewpoint, viewpoints, onViewpointChange, onMet
       });
       textureCache.clear();
       geometry.dispose();
+      overlayGeometry.dispose();
       material.dispose();
+      overlayMaterial.dispose();
       renderer.dispose();
       renderer.forceContextLoss();
       renderer.domElement.remove();
@@ -320,6 +407,9 @@ export function PanoramaViewer({ viewpoint, viewpoints, onViewpointChange, onMet
       rendererRef.current = null;
       cameraRef.current = null;
       materialRef.current = null;
+      overlayMaterialRef.current = null;
+      overlayMeshRef.current = null;
+      transitionRef.current = null;
     };
   }, []);
 
@@ -357,12 +447,12 @@ export function PanoramaViewer({ viewpoint, viewpoints, onViewpointChange, onMet
       return promise;
     };
 
-    void loadTexture(viewpoint.panoramaUrl).then((texture) => {
+    void loadTexture(panoramaUrl).then((texture) => {
       if (cancelled || !mountedRef.current) return;
       const image = texture.image as { width?: number; height?: number };
       const width = Number(image.width ?? 0);
       const height = Number(image.height ?? 0);
-      const metadata = validatePanorama(viewpoint.panoramaUrl, width, height);
+      const metadata = validatePanorama(panoramaUrl, width, height);
 
       if (!isValidPanorama(metadata)) {
         setStatus("failed");
@@ -371,8 +461,18 @@ export function PanoramaViewer({ viewpoint, viewpoints, onViewpointChange, onMet
         return;
       }
 
-      material.map = texture;
-      material.needsUpdate = true;
+      const overlayMaterial = overlayMaterialRef.current;
+      const overlayMesh = overlayMeshRef.current;
+      if (material.map && overlayMaterial && overlayMesh && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        overlayMaterial.map = texture;
+        overlayMaterial.opacity = 0;
+        overlayMaterial.needsUpdate = true;
+        overlayMesh.visible = true;
+        transitionRef.current = { texture, started: performance.now() };
+      } else {
+        material.map = texture;
+        material.needsUpdate = true;
+      }
       setStatus("ready");
       onMetadata(metadata);
 
@@ -388,7 +488,43 @@ export function PanoramaViewer({ viewpoint, viewpoints, onViewpointChange, onMet
     });
 
     return () => { cancelled = true; };
-  }, [onMetadata, viewpoint, viewpoints]);
+  }, [onMetadata, panoramaUrl, viewpoint, viewpoints]);
+
+  const openFurniture = (item?: EditableFurniture, screenX?: number, focus = true) => {
+    const rect = viewportRef.current?.getBoundingClientRect();
+    const bearing = screenX !== undefined && rect ? orientationRef.current.yaw + ((((screenX - rect.left) / rect.width) * 100 - 50) / 82) * orientationRef.current.fov : orientationRef.current.yaw;
+    const next = item ?? (isEmpty ? items[0] : items.reduce<EditableFurniture | null>((nearest, candidate) => !nearest || Math.abs(normalizeDegrees(candidate.bearing - bearing)) < Math.abs(normalizeDegrees(nearest.bearing - bearing)) ? candidate : nearest, null));
+    setActiveItem(next);
+    setEditTab("suggest");
+    setEditMessage("");
+    setEditing(true);
+    if (next && !focus && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const shape = shapeRefs.current.get(next.id);
+      const canvas = rendererRef.current?.domElement;
+      const viewport = viewportRef.current;
+      const points = shape?.getAttribute("points");
+      if (canvas && viewport && points) {
+        try {
+          setSticker({ image: canvas.toDataURL("image/jpeg", 0.84), points, width: viewport.clientWidth, height: viewport.clientHeight });
+          if (stickerTimerRef.current) clearTimeout(stickerTimerRef.current);
+          stickerTimerRef.current = setTimeout(() => setSticker(null), 680);
+        } catch { setSticker(null); }
+      }
+    }
+    if (next && focus) orientationRef.current.targetYaw = next.bearing;
+  };
+
+  const suggest = () => {
+    const text = description.toLowerCase();
+    const options = activeItem?.choices ?? [];
+    const match = options.find((option) => option.id !== "original" && option.id !== "removed" && option.id !== "bed-removed" && option.id !== "bedside-removed" && text.includes(option.label.toLowerCase().split(" ")[0]));
+    if (text.trim() && !match) { setEditMessage("This preview has a small prepared catalog. Try armchair, beanbag, bunk bed, or writing desk."); return; }
+    const suggestion = match ?? options.find((option) => !["original", "removed", "bed-removed", "bedside-removed"].includes(option.id));
+    onChoiceChange(suggestion?.id ?? "original", activeItem?.id);
+    setEditMessage(suggestion ? `${suggestion.label} preview applied.` : "The furnished room is ready.");
+  };
+
+  const clearPress = () => { if (pressTimerRef.current) clearTimeout(pressTimerRef.current); pressTimerRef.current = null; pressOriginRef.current = null; pressedItemRef.current = null; };
 
   const changeYaw = (amount: number) => {
     orientationRef.current.targetYaw += amount;
@@ -420,14 +556,21 @@ export function PanoramaViewer({ viewpoint, viewpoints, onViewpointChange, onMet
     tabIndex={0}
     role="application"
     aria-label={`360 degree panorama from ${viewpoint.name}. Drag to look around, use arrow keys to rotate, and use the mouse wheel to zoom.`}
+    onContextMenu={(event) => { const id = (event.target as Element).closest("[data-furniture-id]")?.getAttribute("data-furniture-id"); if (!id) return; event.preventDefault(); openFurniture(items.find((item) => item.id === id), undefined, false); }}
+    onPointerDownCapture={(event) => { if ((event.target as HTMLElement).closest("button, input, textarea, .furniture-editor") || (event.pointerType === "mouse" && event.button !== 0)) return; const id = (event.target as Element).closest("[data-furniture-id]")?.getAttribute("data-furniture-id"); if (!id) return; pressedItemRef.current = id; pressOriginRef.current = { x: event.clientX, y: event.clientY }; if (event.pointerType === "touch") pressTimerRef.current = setTimeout(() => { openFurniture(items.find((item) => item.id === id), undefined, false); pressedItemRef.current = null; pressTimerRef.current = null; }, 520); }}
+    onPointerMoveCapture={(event) => { if (pressOriginRef.current && Math.hypot(event.clientX - pressOriginRef.current.x, event.clientY - pressOriginRef.current.y) > 12) clearPress(); }}
+    onPointerUpCapture={(event) => { const id = pressedItemRef.current; const start = pressOriginRef.current; if (id && start && Math.hypot(event.clientX - start.x, event.clientY - start.y) < 12) openFurniture(items.find((item) => item.id === id), undefined, false); clearPress(); }}
+    onPointerCancelCapture={clearPress}
   >
     {showFallback && <>
       {/* A raw image remains available when WebGL cannot initialize or load the texture. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img className="panorama-fallback" src={viewpoint.panoramaUrl} alt={`Static panorama of ${viewpoint.name}`} />
+      <img className="panorama-fallback" src={panoramaUrl} alt={`Static panorama of ${viewpoint.name}`} />
     </>}
     <div className="tour-vignette" aria-hidden="true" />
     <div className="tour-reticle" aria-hidden="true"><span /></div>
+
+    {!isEmpty && <svg className="furniture-selection-layer" aria-hidden="true">{sticker && <><defs><clipPath id="furniture-sticker-clip"><polygon points={sticker.points} /></clipPath></defs><g className="furniture-sticker" clipPath="url(#furniture-sticker-clip)"><image href={sticker.image} width={sticker.width} height={sticker.height} /></g></>}{items.map((item) => <polygon key={item.id} data-furniture-id={item.id} ref={(element) => { if (element) shapeRefs.current.set(item.id, element); else shapeRefs.current.delete(item.id); }} className={editing && activeItem?.id === item.id ? "furniture-shape selected" : "furniture-shape"} />)}</svg>}
 
     {neighbourViewpoints.map(({ target }) => <button
       type="button"
@@ -443,6 +586,24 @@ export function PanoramaViewer({ viewpoint, viewpoints, onViewpointChange, onMet
       <span className="hotspot-arrow"><ChevronRight size={15} /></span>
       <span>{target.name}</span>
     </button>)}
+
+    {!isEmpty && items.map((item) => <button type="button" key={item.id} data-furniture-id={item.id} className={editing && activeItem?.id === item.id ? "furniture-hotspot selected" : "furniture-hotspot"} ref={(element) => { if (element) furnitureRefs.current.set(item.id, element); else furnitureRefs.current.delete(item.id); }} onClick={() => openFurniture(item)} aria-label={`Edit ${item.name}`}><Sparkles size={15} /><span>{item.name}</span></button>)}
+
+    <button type="button" className="furniture-trigger" onClick={() => openFurniture()}><Sparkles size={17} /> {isEmpty ? "Suggest furniture" : "Edit furniture"}</button>
+
+    {editing && <section ref={editorRef} tabIndex={-1} role="dialog" className="furniture-editor" aria-label="Furniture editing controls" onPointerDown={(event) => event.stopPropagation()}>
+      <div className="furniture-editor-head"><div><small>{isEmpty ? "EMPTY ROOM" : "SELECTED OBJECT"}</small><strong>{isEmpty ? viewpoint.name : activeItem?.name ?? "Choose a piece"}</strong></div><button type="button" aria-label="Close furniture editor" onClick={() => setEditing(false)}><X size={18} /></button></div>
+      {!isEmpty && items.length > 1 && <div className="furniture-object-list">{items.map((item) => <button type="button" key={item.id} className={activeItem?.id === item.id ? "selected" : ""} onClick={() => { setActiveItem(item); orientationRef.current.targetYaw = item.bearing; }}>{item.name}</button>)}</div>}
+      <div className="furniture-tabs" role="tablist" aria-label="Furniture input">{([ ["suggest","✨ Suggest"], ["inventory","Inventory"], ["reference","Image"], ["describe","Text"] ] as const).map(([id,label]) => <button type="button" key={id} role="tab" aria-selected={editTab === id} className={editTab === id ? "selected" : ""} onClick={() => setEditTab(id)}>{label}</button>)}</div>
+      {editTab === "inventory" && !isEmpty && activeItem ? <div className="furniture-options">{activeItem.choices.map((option) => <button type="button" key={option.id} className={selectedFurnitureChoice(viewpoint.id, choice, activeItem.id) === option.id ? "selected" : ""} onClick={() => { onChoiceChange(option.id, activeItem.id); setEditMessage(`${option.label} preview applied.`); }}><Image src={option.image} alt="" width={140} height={96} unoptimized /><span><strong>{option.label}</strong><small>{option.hint}</small></span></button>)}</div> : null}
+      {editTab === "reference" && <label className="furniture-reference"><ImagePlus size={19} /><span>{referenceName || "Choose a furniture reference image"}</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { setReferenceName(event.target.files?.[0]?.name ?? ""); setEditMessage("Reference selected. Open Inventory to choose the closest prepared option."); }} /></label>}
+      {editTab === "describe" && <label className="furniture-description">Describe the change<textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Try armchair, beanbag, bunk bed, or writing desk" maxLength={180} /></label>}
+      {(editTab !== "inventory" || isEmpty) && <button type="button" className="furniture-suggest-action" onClick={suggest}><WandSparkles size={16} /> {isEmpty ? "Furnish this room" : "Show suggestion"}</button>}
+      {isEmpty && items.length > 0 && <div className="furniture-options compact">{items.flatMap((item) => item.choices.filter((option) => option.id !== "original" && !option.id.includes("removed")).map((option) => ({ item, option }))).map(({ item, option }) => <button type="button" key={option.id} onClick={() => { onChoiceChange(option.id, item.id); setEditMessage(`${option.label} preview applied.`); }}><Image src={option.image} alt="" width={140} height={96} unoptimized /><strong>{option.label}</strong></button>)}</div>}
+      {editMessage && <p className="furniture-message" role="status">{editMessage}</p>}
+      <button type="button" className="furniture-reset" onClick={() => { onChoiceChange("original"); setEditMessage("Original room restored."); }}><RotateCcw size={14} /> Restore original room</button>
+      <p className="furniture-help"><span className="furniture-help-desktop">Click or right-click a highlighted item to edit it.</span><span className="furniture-help-touch">Tap or press a highlighted item to edit it.</span></p>
+    </section>}
 
     <div className="tour-controls">
       <button type="button" aria-label="Look left" onClick={() => changeYaw(-18)}><ChevronLeft /></button>

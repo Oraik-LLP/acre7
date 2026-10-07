@@ -17,6 +17,7 @@ import type { FloorPlanAnalysis, ProviderStatus } from "@/lib/acre7/types";
 import { SiteFooter, SiteHeader } from "@/components/acre7/SiteChrome";
 import { ThemeToggle } from "@/components/acre7/ThemeToggle";
 import { ScrollSpatialStory } from "@/components/acre7/ScrollSpatialStory";
+import { panoramaFor, withFurnitureChoice } from "@/lib/acre7/furniture-demo";
 
 type ParameterKey = "walls" | "flooring" | "style" | "lighting";
 type Screen = "source" | "overview" | "tour";
@@ -70,6 +71,8 @@ export function DesignerApp() {
   const [panoramaMetadata, setPanoramaMetadata] = useState<PanoramaMetadata | null>(null);
   const [isEnteringTour, setIsEnteringTour] = useState(false);
   const [isPreparingTour, setIsPreparingTour] = useState(false);
+  const [startEmpty, setStartEmpty] = useState(false);
+  const [roomChoices, setRoomChoices] = useState<Record<string, string>>({});
   const [parameters, setParameters] = useState<Record<ParameterKey, string>>({
     walls: "Warm white", flooring: "Oak wood", style: "Warm natural", lighting: "Natural daylight",
   });
@@ -87,7 +90,7 @@ export function DesignerApp() {
     if (isEnteringTour || isPreparingTour) return;
     setIsPreparingTour(true);
     try {
-      await preloadImage(selected.panoramaUrl);
+      await preloadImage(panoramaFor(selected, roomChoices[selected.id]));
     } catch {
       // The WebGL viewer owns the visible load/error state and fallback.
     }
@@ -157,9 +160,9 @@ export function DesignerApp() {
       {screen === "source" ? (
         <SourceWorkspace
           file={file} preview={preview} analysis={analysis} analysisError={analysisError} isAnalyzing={isAnalyzing} analysisEnabled={providers?.analysisEnabled ?? false}
-          parameters={parameters} instructions={instructions}
+          parameters={parameters} instructions={instructions} startEmpty={startEmpty} onStartEmpty={setStartEmpty}
           onFile={acceptFile} onInstructions={setInstructions} onPicker={setPicker} onAnalyze={analyze}
-          onOpenReady={() => { setScreen("overview"); setAnalysisError(""); }}
+          onOpenReady={() => { setRoomChoices(Object.fromEntries(viewpoints.map((point) => [point.id, startEmpty ? "empty" : "original"]))); setScreen("overview"); setAnalysisError(""); }}
         />
       ) : (
         <ReadyProject
@@ -168,6 +171,7 @@ export function DesignerApp() {
           onSelect={(id) => { setSelectedViewpoint(id); setPanoramaMetadata(null); }}
           onTour={() => { void enterTour(); }} onOverview={() => { setScreen("overview"); setPanoramaMetadata(null); }}
           onMetadata={setPanoramaMetadata}
+          roomChoices={roomChoices} startEmpty={startEmpty} onRoomChoice={(id, choice, itemId) => setRoomChoices((current) => ({ ...current, [id]: withFurnitureChoice(id, current[id] ?? "original", itemId, choice) }))}
         />
       )}
 
@@ -189,6 +193,7 @@ export function DesignerApp() {
 type SourceProps = {
   file: File | null; preview: string | null; analysis: FloorPlanAnalysis | null; analysisError: string; isAnalyzing: boolean; analysisEnabled: boolean;
   parameters: Record<ParameterKey, string>; instructions: string;
+  startEmpty: boolean; onStartEmpty: (value: boolean) => void;
   onFile: (file?: File) => void; onInstructions: (value: string) => void; onPicker: (key: ParameterKey) => void;
   onAnalyze: () => void; onOpenReady: () => void;
 };
@@ -207,6 +212,8 @@ function SourceWorkspace(props: SourceProps) {
         {props.file && <span className="file-check"><Check size={15} /></span>}
       </button>
       <button type="button" className="ready-project-link" onClick={props.onOpenReady}><span><Sparkles size={16} /> Preview generated Cedar House</span><ArrowRight size={16} /></button>
+
+      <label className="empty-room-choice"><input type="checkbox" checked={props.startEmpty} onChange={(event) => props.onStartEmpty(event.target.checked)} /><span><strong>Start with empty rooms</strong><small>Explore unfurnished rooms, then use ✨ inside the tour to add furniture.</small></span></label>
 
       <div className="prompt-block"><div className="field-label">Design direction</div><div className="prompt-sentence">
         I want to generate this house with <Chip label={props.parameters.walls} onClick={() => props.onPicker("walls")} /> walls, <Chip label={props.parameters.flooring} onClick={() => props.onPicker("flooring")} /> flooring, a <Chip label={props.parameters.style} onClick={() => props.onPicker("style")} /> interior, and <Chip label={props.parameters.lighting} onClick={() => props.onPicker("lighting")} />.
@@ -227,9 +234,10 @@ function SourceWorkspace(props: SourceProps) {
   </section>;
 }
 
-function ReadyProject({ screen, selected, selectedViewpoint, isEntering, isPreparing, panoramaMetadata, onSelect, onTour, onOverview, onMetadata }: {
+function ReadyProject({ screen, selected, selectedViewpoint, isEntering, isPreparing, panoramaMetadata, roomChoices, startEmpty, onRoomChoice, onSelect, onTour, onOverview, onMetadata }: {
   screen: Screen; selected: Viewpoint; selectedViewpoint: string; isEntering: boolean; isPreparing: boolean;
   panoramaMetadata: PanoramaMetadata | null;
+  roomChoices: Record<string, string>; startEmpty: boolean; onRoomChoice: (id: string, choice: string, itemId?: string) => void;
   onSelect: (id: string) => void; onTour: () => void; onOverview: () => void;
   onMetadata: (metadata: PanoramaMetadata | null) => void;
 }) {
@@ -237,18 +245,18 @@ function ReadyProject({ screen, selected, selectedViewpoint, isEntering, isPrepa
     <aside className="control-panel project-panel">
       <div className="eyebrow"><Sparkles size={15} /> Cedar House</div>
       <h1>{screen === "tour" ? selected.name : "Your home, from every angle."}</h1>
-      <p className="intro">{screen === "tour" ? `${selected.roomLabel} · Viewpoint ${selected.index} of 5` : "Five positions connect the furnished overview to an immersive room-by-room tour."}</p>
+      <p className="intro">{screen === "tour" ? `${selected.roomLabel} · Viewpoint ${selected.index} of 5` : "Five positions connect the overview to an immersive room-by-room tour."}</p>
       <div className="project-spec"><span><small>Walls</small>Warm white</span><span><small>Floor</small>Oak wood</span><span><small>Style</small>Warm natural</span><span><small>Light</small>Daylight</span></div>
       <div className="viewpoint-heading"><span>Viewpoints</span><small>5 / 5</small></div>
-      <div className="viewpoint-list">{viewpoints.map((viewpoint) => <button type="button" key={viewpoint.id} aria-pressed={selectedViewpoint === viewpoint.id} className={selectedViewpoint === viewpoint.id ? "viewpoint-item selected" : "viewpoint-item"} onClick={() => onSelect(viewpoint.id)}><span className="viewpoint-thumb" style={{ backgroundImage: `url(${viewpoint.panoramaUrl})` }}><small>{viewpoint.index}</small></span><span><strong>{viewpoint.name}</strong><small>{viewpoint.roomLabel}</small></span><ChevronRight size={16} /></button>)}</div>
+      <div className="viewpoint-list">{viewpoints.map((viewpoint) => <button type="button" key={viewpoint.id} aria-pressed={selectedViewpoint === viewpoint.id} className={selectedViewpoint === viewpoint.id ? "viewpoint-item selected" : "viewpoint-item"} onClick={() => onSelect(viewpoint.id)}><span className="viewpoint-thumb" style={{ backgroundImage: `url(${panoramaFor(viewpoint, roomChoices[viewpoint.id])})` }}><small>{viewpoint.index}</small></span><span><strong>{viewpoint.name}</strong><small>{viewpoint.roomLabel}</small></span><ChevronRight size={16} /></button>)}</div>
       {screen === "tour" ? <Button variant="outline" className="primary-action tour-back" onClick={onOverview}><ArrowLeft /> Back to overview</Button> : <Button className="primary-action" size="lg" onClick={onTour} disabled={isEntering || isPreparing}>{isPreparing ? "Preparing panorama…" : isEntering ? "Entering…" : "Enter panoramic tour"} <ArrowRight /></Button>}
     </aside>
 
     <section className="canvas-panel project-canvas">
-      <div className="canvas-toolbar"><div><span className="canvas-title">{screen === "tour" ? selected.name : "Furnished overview"}</span><span className="canvas-status">{screen === "tour" ? "360° panorama · drag, look up or down, and zoom" : "Choose a point to preview its room"}</span></div><span className="resolution-pill">{screen === "tour" ? panoramaMetadata ? `${panoramaMetadata.width} × ${panoramaMetadata.height}` : "Loading texture" : "5 viewpoints"}</span></div>
-      {screen === "tour" ? <PanoramaViewer viewpoint={selected} viewpoints={viewpoints} onViewpointChange={onSelect} onMetadata={onMetadata} /> : <div className={isEntering ? "overview-canvas entering-tour" : "overview-canvas"} style={{ "--focus-x": `${selected.planPosition.x}%`, "--focus-y": `${selected.planPosition.y}%` } as CSSProperties}>
-        <NextImage className="overhead-image" src="/demo/apartment-overhead.png" alt="Furnished overhead view of Cedar House" width={1672} height={1000} unoptimized />
-        <div className="transition-panorama" style={{ backgroundImage: `url(${selected.panoramaUrl})` }} />
+      <div className="canvas-toolbar"><div><span className="canvas-title">{screen === "tour" ? selected.name : "House overview"}</span><span className="canvas-status">{screen === "tour" ? "360° panorama · drag, look up or down, and zoom" : "Choose a point to preview its room"}</span></div><span className="resolution-pill">{screen === "tour" ? panoramaMetadata ? `${panoramaMetadata.width} × ${panoramaMetadata.height}` : "Loading texture" : "5 viewpoints"}</span></div>
+      {screen === "tour" ? <PanoramaViewer viewpoint={selected} viewpoints={viewpoints} panoramaUrl={panoramaFor(selected, roomChoices[selected.id])} choice={roomChoices[selected.id] ?? "original"} onChoiceChange={(choice, itemId) => onRoomChoice(selected.id, choice, itemId)} onViewpointChange={onSelect} onMetadata={onMetadata} /> : <div className={isEntering ? "overview-canvas entering-tour" : "overview-canvas"} style={{ "--focus-x": `${selected.planPosition.x}%`, "--focus-y": `${selected.planPosition.y}%` } as CSSProperties}>
+        <NextImage className="overhead-image" src={startEmpty ? "/demo/furniture/apartment-overhead-empty.webp" : "/demo/apartment-overhead.png"} alt={`${startEmpty ? "Empty" : "Furnished"} overhead view of Cedar House`} width={1672} height={1000} unoptimized />
+        <div className="transition-panorama" style={{ backgroundImage: `url(${panoramaFor(selected, roomChoices[selected.id])})` }} />
         <div className="transition-label"><MapPin size={16} /><span>Entering {selected.name}</span></div>
         {viewpoints.map((viewpoint) => <button type="button" aria-label={`Open ${viewpoint.name}`} title={viewpoint.name} key={viewpoint.id} className={selectedViewpoint === viewpoint.id ? "map-point active" : "map-point"} style={{ left: `${viewpoint.planPosition.x}%`, top: `${viewpoint.planPosition.y}%` }} onClick={() => onSelect(viewpoint.id)} disabled={isEntering || isPreparing}><span>{viewpoint.index}</span></button>)}
         <div className="overview-caption"><span className="viewpoint-index">{selected.index}</span><div><strong>{selected.name}</strong><small>{selected.roomLabel}</small></div><button type="button" onClick={onTour} disabled={isEntering || isPreparing}>{isPreparing ? "Preparing…" : isEntering ? "Entering…" : "Open view"} <ArrowRight size={14} /></button></div>

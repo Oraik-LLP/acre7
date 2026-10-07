@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { ThemeProvider } from "@/components/acre7/ThemeProvider";
 import "./globals.css";
 import "./acre7-enhancements.css";
+import "./furniture-demo.css";
 
 export const metadata: Metadata = {
   title: "Acre7 — See the house before the walls are finished",
