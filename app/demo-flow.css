@@ -1,7 +1,7 @@
 ::view-transition-group(root) { animation: none; }
 ::view-transition-old(root), ::view-transition-new(root) { mix-blend-mode: normal; }
 ::view-transition-old(root) { animation: none; z-index: 1; }
-::view-transition-new(root) { z-index: 2; animation: theme-reveal 480ms cubic-bezier(.4,0,.2,1) both; }
+::view-transition-new(root) { z-index: 2; animation: theme-reveal 1000ms cubic-bezier(.4,0,.2,1) both; }
 ::view-transition-image-pair(root) { isolation: isolate; }
 @keyframes theme-reveal {
   from { clip-path: circle(0px at var(--theme-reveal-x,50%) var(--theme-reveal-y,0px)); }
@@ -13,7 +13,8 @@
 ::view-transition-new(acre7-theme-icon) { animation: theme-icon-in 180ms ease-out both; }
 @keyframes theme-icon-out { to { opacity: 0; transform: rotate(60deg) scale(.65); } }
 @keyframes theme-icon-in { from { opacity: 0; transform: rotate(-60deg) scale(.65); } to { opacity: 1; transform: none; } }
-.theme-toggle:active { transform: scale(.86) rotate(12deg); }
+.theme-toggle:hover { transform: none; }
+.theme-toggle:active { transform: scale(.96); }
 html[data-theme="dark"] { color-scheme: dark; }
 html[data-theme="light"] { color-scheme: light; }
 .steps .step { border: 0; padding: 0; min-height: 44px; background: transparent; cursor: pointer; }
