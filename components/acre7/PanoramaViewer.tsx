@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, ChevronLeft, ChevronRight, LoaderCircle, MapPin, Maximize2, Minimize2, Move, Sparkles, X, RotateCcw, ImagePlus, WandSparkles } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, LoaderCircle, MapPin, Maximize2, Minimize2, Move, Sparkles, X, RotateCcw, ImagePlus, WandSparkles, Smartphone, Compass, Grid2X2, ArrowLeft } from "lucide-react";
 import * as THREE from "three";
 import Image from "next/image";
 import { isValidPanorama, validatePanorama } from "@/lib/acre7/scene/panorama";
 import { normalizeDegrees } from "@/lib/acre7/scene/coordinates";
 import type { PanoramaMetadata, Viewpoint } from "@/lib/acre7/scene/types";
 import { editableFurniture, selectedFurnitureChoice, type EditableFurniture } from "@/lib/acre7/furniture-demo";
+import { adjacentViewpointIndex, frameSmoothing } from "@/lib/acre7/scene/motion";
+import { usePanoramaMotion } from "@/hooks/use-panorama-motion";
 
 type ViewerStatus = "loading" | "ready" | "failed" | "webgl-unavailable";
 
@@ -19,6 +21,7 @@ type PanoramaViewerProps = {
   panoramaUrl: string;
   choice: string;
   onChoiceChange: (choice: string, itemId?: string) => void;
+  onOverview: () => void;
 };
 
 type Orientation = {
@@ -58,7 +61,7 @@ function pointerDistance(points: Map<number, { x: number; y: number }>) {
   return Math.hypot(second.x - first.x, second.y - first.y);
 }
 
-export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onChoiceChange, onViewpointChange, onMetadata }: PanoramaViewerProps) {
+export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onChoiceChange, onViewpointChange, onMetadata, onOverview }: PanoramaViewerProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -82,6 +85,8 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
   const pointerPositionsRef = useRef(new Map<number, { x: number; y: number }>());
   const dragStartRef = useRef<DragStart | null>(null);
   const pinchStartRef = useRef<PinchStart | null>(null);
+  const velocityRef = useRef({ yaw: 0, pitch: 0, time: 0, x: 0, y: 0 });
+  const reducedMotionRef = useRef(false);
   const orientationRef = useRef<Orientation>({
     yaw: viewpoint.initialYaw,
     pitch: viewpoint.initialPitch,
@@ -93,6 +98,8 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
   const [status, setStatus] = useState<ViewerStatus>("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [roomMenuOpen, setRoomMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [activeItem, setActiveItem] = useState<EditableFurniture | null>(null);
   const [editTab, setEditTab] = useState<"suggest" | "inventory" | "reference" | "describe">("suggest");
@@ -102,6 +109,18 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
   const [sticker, setSticker] = useState<{ image: string; points: string; width: number; height: number } | null>(null);
   const items = editableFurniture[viewpoint.id] ?? [];
   const isEmpty = choice === "empty";
+  const motion = usePanoramaMotion(orientationRef);
+  const motionRecenter = motion.recenter;
+  const currentIndex = viewpoints.findIndex((candidate) => candidate.id === viewpoint.id);
+  const previousIndex = adjacentViewpointIndex(currentIndex, -1, viewpoints.length);
+  const nextIndex = adjacentViewpointIndex(currentIndex, 1, viewpoints.length);
+
+  useEffect(() => {
+    if (!isExpanded) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [isExpanded]);
 
   useEffect(() => {
     if (editing) editorRef.current?.focus({ preventScroll: true });
@@ -120,15 +139,19 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
 
   useEffect(() => {
     viewpointRef.current = viewpoint;
-    queueMicrotask(() => { setActiveItem(null); setEditing(false); setEditMessage(""); });
+    queueMicrotask(() => { setActiveItem(null); setEditing(false); setEditMessage(""); setRoomMenuOpen(false); });
+    pointerPositionsRef.current.clear();
+    dragStartRef.current = null;
+    pinchStartRef.current = null;
+    velocityRef.current.yaw = 0;
+    velocityRef.current.pitch = 0;
     const orientation = orientationRef.current;
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     orientation.targetYaw = viewpoint.initialYaw;
     orientation.targetPitch = viewpoint.initialPitch;
     orientation.targetFov = viewpoint.initialFov;
     orientation.yaw = viewpoint.initialYaw;
     orientation.pitch = viewpoint.initialPitch;
-    orientation.fov = reducedMotion ? viewpoint.initialFov : Math.min(maxFov, viewpoint.initialFov + 25);
+    orientation.fov = viewpoint.initialFov;
   }, [viewpoint]);
 
   useEffect(() => {
@@ -137,6 +160,9 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
     const textureCache = textureCacheRef.current;
 
     mountedRef.current = true;
+    const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const syncMotionPreference = () => { reducedMotionRef.current = motionPreference.matches; };
+    syncMotionPreference();
     let renderer: THREE.WebGLRenderer;
 
     try {
@@ -179,6 +205,7 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
     materialRef.current = material;
     overlayMaterialRef.current = overlayMaterial;
     overlayMeshRef.current = overlaySphere;
+    motionPreference.addEventListener("change", syncMotionPreference);
 
     const resize = () => {
       const { width, height } = viewport.getBoundingClientRect();
@@ -201,10 +228,12 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as HTMLElement;
       if (target.closest("button, input, textarea, .furniture-editor")) return;
+      if (event.pointerType === "mouse" && event.button !== 0) return;
       event.preventDefault();
       viewport.focus({ preventScroll: true });
       viewport.setPointerCapture(event.pointerId);
       pointerPositionsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      velocityRef.current = { yaw: 0, pitch: 0, time: performance.now(), x: event.clientX, y: event.clientY };
 
       if (pointerPositionsRef.current.size === 1) {
         const orientation = orientationRef.current;
@@ -212,9 +241,11 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
           pointerId: event.pointerId,
           x: event.clientX,
           y: event.clientY,
-          yaw: orientation.targetYaw,
-          pitch: orientation.targetPitch,
+          yaw: orientation.yaw,
+          pitch: orientation.pitch,
         };
+        orientation.targetYaw = orientation.yaw;
+        orientation.targetPitch = orientation.pitch;
       } else if (pointerPositionsRef.current.size === 2) {
         pinchStartRef.current = {
           distance: pointerDistance(pointerPositionsRef.current),
@@ -243,15 +274,29 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
 
       const dragStart = dragStartRef.current;
       if (!dragStart || dragStart.pointerId !== event.pointerId) return;
-      orientationRef.current.targetYaw = dragStart.yaw + (dragStart.x - event.clientX) * 0.14;
+      const rect = viewport.getBoundingClientRect();
+      const verticalFov = orientationRef.current.fov;
+      const horizontalFov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(verticalFov) / 2) * camera.aspect));
+      const yawScale = horizontalFov / Math.max(rect.width, 1);
+      const pitchScale = verticalFov / Math.max(rect.height, 1);
+      orientationRef.current.targetYaw = dragStart.yaw + (dragStart.x - event.clientX) * yawScale;
       orientationRef.current.targetPitch = clamp(
-        dragStart.pitch + (dragStart.y - event.clientY) * 0.12,
+        dragStart.pitch + (event.clientY - dragStart.y) * pitchScale,
         minPitch,
         maxPitch,
       );
+      const velocity = velocityRef.current;
+      const now = performance.now();
+      const elapsed = Math.max((now - velocity.time) / 1000, 0.008);
+      velocity.yaw = clamp((velocity.x - event.clientX) * yawScale / elapsed, -160, 160);
+      velocity.pitch = clamp((event.clientY - velocity.y) * pitchScale / elapsed, -100, 100);
+      velocity.time = now;
+      velocity.x = event.clientX;
+      velocity.y = event.clientY;
     };
 
     const endPointer = (event: PointerEvent) => {
+      if (!pointerPositionsRef.current.has(event.pointerId)) return;
       pointerPositionsRef.current.delete(event.pointerId);
       if (viewport.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
       pinchStartRef.current = null;
@@ -269,6 +314,10 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
         };
       } else {
         dragStartRef.current = null;
+        if (event.type !== "pointerup" || performance.now() - velocityRef.current.time > 80 || reducedMotionRef.current) {
+          velocityRef.current.yaw = 0;
+          velocityRef.current.pitch = 0;
+        }
       }
     };
 
@@ -283,9 +332,11 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { setEditing(false); return; }
+      if (event.key === "Escape") { setEditing(false); setIsExpanded(false); setRoomMenuOpen(false); return; }
       if ((event.target as HTMLElement).closest("input, textarea")) return;
       const orientation = orientationRef.current;
+      velocityRef.current.yaw = 0;
+      velocityRef.current.pitch = 0;
       if (event.key === "ArrowLeft") orientation.targetYaw -= 12;
       else if (event.key === "ArrowRight") orientation.targetYaw += 12;
       else if (event.key === "ArrowUp") orientation.targetPitch = clamp(orientation.targetPitch + 8, minPitch, maxPitch);
@@ -300,19 +351,39 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
     viewport.addEventListener("pointermove", onPointerMove);
     viewport.addEventListener("pointerup", endPointer);
     viewport.addEventListener("pointercancel", endPointer);
+    viewport.addEventListener("lostpointercapture", endPointer);
     viewport.addEventListener("wheel", onWheel, { passive: false });
     viewport.addEventListener("keydown", onKeyDown);
     renderer.domElement.addEventListener("webglcontextlost", onContextLost);
 
     let animationFrame = 0;
-    const render = () => {
+    let lastFrame = performance.now();
+    const worldPoint = new THREE.Vector3();
+    const projectedPoint = new THREE.Vector3();
+    const cameraForward = new THREE.Vector3();
+    const render = (now = performance.now()) => {
+      const delta = Math.min(Math.max((now - lastFrame) / 1000, 0), 0.05);
+      lastFrame = now;
       const orientation = orientationRef.current;
-      orientation.yaw += (orientation.targetYaw - orientation.yaw) * 0.12;
-      orientation.pitch += (orientation.targetPitch - orientation.pitch) * 0.12;
-      orientation.fov += (orientation.targetFov - orientation.fov) * 0.12;
+      const velocity = velocityRef.current;
+      if (!pointerPositionsRef.current.size && !reducedMotionRef.current) {
+        orientation.targetYaw += velocity.yaw * delta;
+        orientation.targetPitch = clamp(orientation.targetPitch + velocity.pitch * delta, minPitch, maxPitch);
+        const decay = Math.exp(-7 * delta);
+        velocity.yaw *= decay;
+        velocity.pitch *= decay;
+        if (Math.abs(velocity.yaw) < 0.1) velocity.yaw = 0;
+        if (Math.abs(velocity.pitch) < 0.1) velocity.pitch = 0;
+      }
+      const smoothing = frameSmoothing(delta, pointerPositionsRef.current.size ? 28 : 14);
+      orientation.yaw += (orientation.targetYaw - orientation.yaw) * smoothing;
+      orientation.pitch += (orientation.targetPitch - orientation.pitch) * smoothing;
+      orientation.fov += (orientation.targetFov - orientation.fov) * smoothing;
 
       camera.rotation.y = THREE.MathUtils.degToRad(-orientation.yaw);
       camera.rotation.x = THREE.MathUtils.degToRad(orientation.pitch);
+      camera.updateMatrixWorld();
+      camera.getWorldDirection(cameraForward);
       if (Math.abs(camera.fov - orientation.fov) > 0.01) {
         camera.fov = orientation.fov;
         camera.updateProjectionMatrix();
@@ -333,38 +404,36 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
       const normalizedYaw = normalizeDegrees(orientation.yaw);
       if (headingRef.current) headingRef.current.textContent = `${Math.round(normalizedYaw)}°`;
 
-      viewpointRef.current.neighbours.forEach((neighbour) => {
-        const element = hotspotRefs.current.get(neighbour.viewpointId);
-        if (!element) return;
-        const relativeBearing = normalizeDegrees(neighbour.bearing - normalizedYaw);
-        const visible = Math.abs(relativeBearing) < orientation.fov * 0.62;
-        const horizontal = 50 + (relativeBearing / orientation.fov) * 82;
-        const vertical = clamp(67 + orientation.pitch * 0.35, 26, 82);
-        element.style.left = `${horizontal}%`;
-        element.style.top = `${vertical}%`;
-        element.style.opacity = visible ? "1" : "0";
-        element.style.pointerEvents = visible ? "auto" : "none";
-      });
-
       const projectPoint = (bearing: number, pitch: number) => {
         const longitude = THREE.MathUtils.degToRad(bearing);
         const latitude = THREE.MathUtils.degToRad(pitch);
-        const point = new THREE.Vector3(Math.sin(longitude) * Math.cos(latitude), Math.sin(latitude), -Math.cos(longitude) * Math.cos(latitude)).multiplyScalar(10).project(camera);
-        return { x: (point.x + 1) * renderer.domElement.clientWidth / 2, y: (1 - point.y) * renderer.domElement.clientHeight / 2 };
+        worldPoint.set(Math.sin(longitude) * Math.cos(latitude), Math.sin(latitude), -Math.cos(longitude) * Math.cos(latitude)).multiplyScalar(10);
+        const inFront = worldPoint.dot(cameraForward) > 0;
+        const point = projectedPoint.copy(worldPoint).project(camera);
+        return { x: (point.x + 1) * viewport.clientWidth / 2, y: (1 - point.y) * viewport.clientHeight / 2, visible: inFront && Math.abs(point.x) < 0.88 && Math.abs(point.y) < 0.78 };
       };
-      const horizontalFov = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(orientation.fov) / 2) * camera.aspect));
+      viewpointRef.current.neighbours.forEach((neighbour) => {
+        const element = hotspotRefs.current.get(neighbour.viewpointId);
+        if (!element) return;
+        const point = projectPoint(neighbour.bearing, -18);
+        element.style.left = `${point.x}px`;
+        element.style.top = `${point.y}px`;
+        element.style.opacity = point.visible ? "1" : "0";
+        element.style.pointerEvents = point.visible ? "auto" : "none";
+        element.style.visibility = point.visible ? "visible" : "hidden";
+      });
       (editableFurniture[viewpointRef.current.id] ?? []).forEach((item) => {
         const element = furnitureRefs.current.get(item.id);
         const shape = shapeRefs.current.get(item.id);
         if (!element && !shape) return;
-        const relativeBearing = normalizeDegrees(item.bearing - normalizedYaw);
-        const visible = Math.abs(relativeBearing) < horizontalFov * 0.55;
+        const center = projectPoint(item.bearing, item.pitch);
+        const visible = center.visible;
         if (element) {
-          const center = projectPoint(item.bearing, item.pitch);
           element.style.left = `${center.x}px`;
           element.style.top = `${center.y}px`;
           element.style.opacity = visible ? "1" : "0";
           element.style.pointerEvents = visible ? "auto" : "none";
+          element.style.visibility = visible ? "visible" : "hidden";
         }
         if (shape) {
           shape.style.opacity = visible ? "1" : "0";
@@ -389,8 +458,10 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
       viewport.removeEventListener("pointermove", onPointerMove);
       viewport.removeEventListener("pointerup", endPointer);
       viewport.removeEventListener("pointercancel", endPointer);
+      viewport.removeEventListener("lostpointercapture", endPointer);
       viewport.removeEventListener("wheel", onWheel);
       viewport.removeEventListener("keydown", onKeyDown);
+      motionPreference.removeEventListener("change", syncMotionPreference);
       renderer.domElement.removeEventListener("webglcontextlost", onContextLost);
       textureCache.forEach((texturePromise) => {
         void texturePromise.then((texture) => texture.dispose()).catch(() => undefined);
@@ -441,7 +512,7 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
         texture.magFilter = THREE.LinearFilter;
         texture.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8);
         return texture;
-      });
+      }).catch((error) => { textureCacheRef.current.delete(url); throw error; });
 
       textureCacheRef.current.set(url, promise);
       return promise;
@@ -470,6 +541,9 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
         overlayMesh.visible = true;
         transitionRef.current = { texture, started: performance.now() };
       } else {
+        transitionRef.current = null;
+        if (overlayMesh) overlayMesh.visible = false;
+        if (overlayMaterial) { overlayMaterial.map = null; overlayMaterial.opacity = 0; }
         material.map = texture;
         material.needsUpdate = true;
       }
@@ -511,7 +585,7 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
         } catch { setSticker(null); }
       }
     }
-    if (next && focus) orientationRef.current.targetYaw = next.bearing;
+    if (next && focus) orientationRef.current.targetYaw = orientationRef.current.yaw + normalizeDegrees(next.bearing - orientationRef.current.yaw);
   };
 
   const suggest = () => {
@@ -526,20 +600,26 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
 
   const clearPress = () => { if (pressTimerRef.current) clearTimeout(pressTimerRef.current); pressTimerRef.current = null; pressOriginRef.current = null; pressedItemRef.current = null; };
 
-  const changeYaw = (amount: number) => {
-    orientationRef.current.targetYaw += amount;
-    viewportRef.current?.focus({ preventScroll: true });
+  const recenter = () => {
+    velocityRef.current.yaw = 0;
+    velocityRef.current.pitch = 0;
+    orientationRef.current.targetYaw = orientationRef.current.yaw + normalizeDegrees(viewpoint.initialYaw - orientationRef.current.yaw);
+    orientationRef.current.targetPitch = viewpoint.initialPitch;
+    orientationRef.current.targetFov = viewpoint.initialFov;
+    motionRecenter();
   };
 
   const toggleFullscreen = async () => {
     const viewport = viewportRef.current;
-    if (!viewport || !document.fullscreenEnabled || typeof viewport.requestFullscreen !== "function") return;
+    if (!viewport) return;
+    if (isExpanded) { setIsExpanded(false); return; }
+    if (document.fullscreenElement === viewport) { await document.exitFullscreen(); return; }
+    if (!document.fullscreenEnabled || typeof viewport.requestFullscreen !== "function") { setIsExpanded(true); return; }
 
     try {
-      if (document.fullscreenElement === viewport) await document.exitFullscreen();
-      else await viewport.requestFullscreen();
+      await viewport.requestFullscreen();
     } catch {
-      setErrorMessage("Fullscreen mode could not be opened in this browser.");
+      setIsExpanded(true);
     }
   };
 
@@ -552,7 +632,7 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
 
   return <div
     ref={viewportRef}
-    className="panorama-viewport"
+    className={`panorama-viewport${isExpanded ? " is-expanded" : ""}${editing ? " is-editing" : ""}`}
     tabIndex={0}
     role="application"
     aria-label={`360 degree panorama from ${viewpoint.name}. Drag to look around, use arrow keys to rotate, and use the mouse wheel to zoom.`}
@@ -605,23 +685,33 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
       <p className="furniture-help"><span className="furniture-help-desktop">Click or right-click a highlighted item to edit it.</span><span className="furniture-help-touch">Tap or press a highlighted item to edit it.</span></p>
     </section>}
 
-    <div className="tour-controls">
-      <button type="button" aria-label="Look left" onClick={() => changeYaw(-18)}><ChevronLeft /></button>
-      <span><Move size={14} /> Drag to look · <span ref={headingRef}>0°</span></span>
-      <button type="button" aria-label="Look right" onClick={() => changeYaw(18)}><ChevronRight /></button>
+    <div className="tour-topline">
+      <button type="button" className="tour-overview" onClick={onOverview} aria-label="Back to house overview"><ArrowLeft size={18} /></button>
+      <button type="button" className="tour-room-selector" aria-expanded={roomMenuOpen} aria-controls="tour-room-menu" onClick={() => setRoomMenuOpen((open) => !open)}><MapPin size={15} /><span>{viewpoint.name}<small>Cedar House · {currentIndex + 1} / {viewpoints.length}</small></span><Grid2X2 size={16} /></button>
     </div>
-    <div className="tour-location"><MapPin size={15} /><span>{viewpoint.name}</span></div>
-    <div className="tour-progress" aria-label={`Viewpoint ${viewpoint.index} of ${viewpoints.length}`}>{viewpoints.map((candidate) => <span key={candidate.id} className={candidate.id === viewpoint.id ? "active" : ""} />)}</div>
+    {roomMenuOpen && <nav className="tour-room-menu" id="tour-room-menu" aria-label="Choose a room">{viewpoints.map((candidate) => <button key={candidate.id} type="button" aria-current={candidate.id === viewpoint.id ? "step" : undefined} onClick={() => { setRoomMenuOpen(false); onViewpointChange(candidate.id); }}><Image src={candidate.panoramaUrl} width={64} height={40} alt="" unoptimized /><span>{candidate.name}</span><small>{candidate.index}</small></button>)}</nav>}
+    <div className="tour-tools">
+      {motion.available && <button type="button" className={motion.status !== "off" ? "tour-motion active" : "tour-motion"} aria-pressed={motion.status !== "off"} onClick={() => { velocityRef.current.yaw = 0; velocityRef.current.pitch = 0; void motion.toggle(); }} title="Look around by moving your phone"><Smartphone size={18} /><span>{motion.status === "starting" ? "Connecting…" : motion.status === "on" ? "Motion on" : "Use motion"}</span></button>}
+      <button type="button" aria-label="Recenter view" title="Recenter view" onClick={recenter}><Compass size={18} /></button>
     <button
       type="button"
-      className="tour-fullscreen"
-      aria-label={isFullscreen ? "Exit fullscreen panorama" : "View panorama fullscreen"}
-      title={isFullscreen ? "Exit fullscreen" : "View fullscreen"}
-      aria-pressed={isFullscreen}
+      aria-label={isFullscreen || isExpanded ? "Exit fullscreen panorama" : "View panorama fullscreen"}
+      title={isFullscreen || isExpanded ? "Exit fullscreen" : "View fullscreen"}
+      aria-pressed={isFullscreen || isExpanded}
       onClick={() => void toggleFullscreen()}
     >
-      {isFullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+      {isFullscreen || isExpanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
     </button>
+    </div>
+    <div className="tour-navigation">
+      <p className="tour-gesture-hint"><Move size={14} /><span>{motion.status === "on" ? "Move your phone to look around" : "Drag to look · Pinch or scroll to zoom"}</span><span ref={headingRef} className="tour-heading">0°</span></p>
+      <nav className="tour-room-nav" aria-label="Room navigation">
+        <button type="button" aria-label="Previous room" disabled={previousIndex === null} onClick={() => { if (previousIndex !== null) onViewpointChange(viewpoints[previousIndex].id); }}><ChevronLeft size={20} /><span>Previous</span></button>
+        <span className="tour-room-count" aria-live="polite">{currentIndex + 1}<span> / {viewpoints.length}</span></span>
+        <button type="button" aria-label="Next room" disabled={nextIndex === null} onClick={() => { if (nextIndex !== null) onViewpointChange(viewpoints[nextIndex].id); }}><span>Next</span><ChevronRight size={20} /></button>
+      </nav>
+    </div>
+    {motion.message && <div className="tour-message" role="status"><span>{motion.message}</span><button type="button" aria-label="Dismiss viewer message" onClick={motion.clearMessage}><X size={16} /></button></div>}
 
     {status === "loading" && <div className="panorama-state" role="status"><LoaderCircle className="spin" /><span>Preparing 360° view…</span></div>}
     {showFallback && <div className="panorama-state panorama-state-error" role="alert"><AlertTriangle /><span>{errorMessage}</span></div>}

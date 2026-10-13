@@ -1,0 +1,68 @@
+/* The photograph is the presentation; controls stay along its edges. */
+.panorama-viewport { animation: none; isolation: isolate; }
+.panorama-viewport.is-expanded { position: fixed; inset: 0; z-index: 100; width: 100%; height: 100dvh; min-height: 0; }
+.tour-reticle { display: none; }
+.tour-topline { position: absolute; z-index: 7; top: max(16px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); display: flex; align-items: flex-start; gap: 8px; }
+.tour-topline button, .tour-tools button { min-height: 44px; border: 1px solid rgba(255,255,255,.2); color: #fff; background: rgba(12,18,15,.84); backdrop-filter: blur(12px); cursor: pointer; }
+.tour-overview, .tour-tools > button { display: grid; place-items: center; width: 44px; border-radius: 12px; }
+.tour-room-selector { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; text-align: left; }
+.tour-room-selector > span { display: grid; gap: 3px; font-size: 12px; font-weight: 700; }
+.tour-room-selector small { color: #d1dacb; font-size: 10px; font-weight: 450; }
+.tour-room-selector > svg:first-child { color: #d8fa75; }
+.tour-room-selector > svg:last-child { margin-left: 5px; color: #d1dacb; }
+.tour-tools { position: absolute; z-index: 7; top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); display: flex; gap: 8px; }
+.tour-tools .tour-motion { display: flex; width: auto; gap: 7px; padding: 0 12px; font-size: 11px; font-weight: 650; }
+.tour-tools .tour-motion.active { border-color: #d8fa75; color: #172014; background: #d8fa75; }
+.tour-topline button:hover, .tour-tools button:hover { background: #253329; }
+.tour-tools .tour-motion.active:hover { background: #c7ec64; }
+.panorama-viewport button:focus-visible { outline: 2px solid #d8fa75; outline-offset: 3px; }
+.tour-navigation { position: absolute; z-index: 6; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); width: min(340px, calc(100% - 32px)); transform: translateX(-50%); }
+.tour-gesture-hint { display: flex; justify-content: center; align-items: center; gap: 7px; margin: 0 0 10px; color: #fff; font-size: 11px; text-shadow: 0 1px 5px #000; pointer-events: none; }
+.tour-heading { font-variant-numeric: tabular-nums; min-width: 28px; }
+.tour-room-nav { display: flex; justify-content: space-between; align-items: center; padding: 5px; border: 1px solid rgba(255,255,255,.24); border-radius: 14px; color: #fff; background: rgba(12,18,15,.88); backdrop-filter: blur(12px); }
+.tour-room-nav button { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 44px; min-width: 104px; padding: 0 10px; border: 0; border-radius: 9px; color: #fff; background: transparent; font-size: 12px; font-weight: 650; }
+.tour-room-nav button:hover:enabled { background: #2a372d; }
+.tour-room-nav button:disabled { color: #8f9b94; cursor: default; }
+.tour-room-count { font-size: 14px; font-variant-numeric: tabular-nums; }
+.tour-room-count > span { color: #c0cdc3; font-size: 11px; }
+.tour-room-menu { position: absolute; z-index: 10; top: calc(max(16px, env(safe-area-inset-top)) + 70px); left: max(16px, env(safe-area-inset-left)); width: min(310px, calc(100% - 32px)); padding: 6px; border: 1px solid #5f6a60; border-radius: 14px; background: #131e17; }
+.tour-room-menu button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 54px; padding: 6px; border: 0; border-radius: 8px; color: #f4f7f0; background: transparent; text-align: left; font-size: 12px; }
+.tour-room-menu button:hover { background: #263428; }
+.tour-room-menu button[aria-current] { background: #d8fa75; color: #172014; }
+.tour-room-menu img { width: 64px; height: 40px; object-fit: cover; border-radius: 5px; }
+.tour-room-menu small { margin-left: auto; padding: 0 8px; font-variant-numeric: tabular-nums; }
+.tour-message { position: absolute; z-index: 13; top: 92px; left: 50%; display: flex; align-items: center; gap: 8px; width: min(360px, calc(100% - 32px)); padding: 10px 12px; border: 1px solid #778573; border-radius: 12px; color: #fff; background: #19271e; transform: translateX(-50%); font-size: 12px; line-height: 1.5; }
+.tour-message button { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border: 0; color: #fff; background: transparent; }
+.panorama-viewport .furniture-trigger { right: 16px; top: 80px; bottom: auto; min-height: 44px; }
+.panorama-viewport:not(.is-editing) .furniture-selection-layer { opacity: 0; }
+.panorama-viewport:not(.is-editing) .furniture-hotspot { display: none; }
+.panorama-viewport .panorama-state { max-width: calc(100% - 32px); }
+
+@media (max-width: 980px) {
+  .screen-tour .steps { display: none; }
+  .screen-tour .ready-workspace { height: calc(100dvh - 64px); min-height: 0; display: block; overflow: hidden; }
+  .screen-tour .project-panel, .screen-tour .canvas-toolbar, .screen-tour .canvas-footer { display: none; }
+  .screen-tour .ready-workspace .project-canvas { height: 100%; min-height: 0; }
+}
+@media (max-width: 700px) {
+  .screen-tour .ready-workspace { height: calc(100dvh - 58px); }
+  .tour-topline { top: 12px; left: max(12px, env(safe-area-inset-left)); }
+  .tour-room-selector { gap: 7px; padding: 9px; }
+  .tour-room-selector > svg:first-child { display: none; }
+  .tour-room-selector > span { font-size: 11px; }
+  .tour-tools { top: 78px; right: max(12px, env(safe-area-inset-right)); flex-direction: column; align-items: flex-end; }
+  .tour-tools .tour-motion { min-height: 44px; }
+  .panorama-viewport .furniture-trigger { top: auto; right: max(12px, env(safe-area-inset-right)); bottom: calc(max(16px, env(safe-area-inset-bottom)) + 100px); min-height: 44px; padding: 10px 12px; font-size: 11px; }
+  .tour-room-menu { top: 78px; left: max(12px, env(safe-area-inset-left)); }
+  .tour-gesture-hint { font-size: 10px; }
+  .panorama-viewport.is-expanded .tour-topline { top: max(12px, env(safe-area-inset-top)); }
+  .panorama-viewport.is-expanded .tour-tools { top: calc(max(12px, env(safe-area-inset-top)) + 66px); }
+}
+@media (max-width: 980px) and (max-height: 500px) and (orientation: landscape) {
+  .screen-tour .topbar { display: none; }
+  .screen-tour .ready-workspace { height: 100dvh; }
+  .tour-tools { top: max(12px, env(safe-area-inset-top)); flex-direction: row; }
+  .tour-navigation { bottom: max(8px, env(safe-area-inset-bottom)); }
+  .tour-gesture-hint { display: none; }
+  .panorama-viewport .furniture-trigger { bottom: max(12px, env(safe-area-inset-bottom)); top: auto; }
+}

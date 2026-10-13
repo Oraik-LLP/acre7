@@ -162,13 +162,13 @@ export function DesignerApp() {
           file={file} preview={preview} analysis={analysis} analysisError={analysisError} isAnalyzing={isAnalyzing} analysisEnabled={providers?.analysisEnabled ?? false}
           parameters={parameters} instructions={instructions} startEmpty={startEmpty} onStartEmpty={setStartEmpty}
           onFile={acceptFile} onInstructions={setInstructions} onPicker={setPicker} onAnalyze={analyze}
-          onOpenReady={() => { setRoomChoices(Object.fromEntries(viewpoints.map((point) => [point.id, startEmpty ? "empty" : "original"]))); setScreen("overview"); setAnalysisError(""); }}
+          onOpenReady={() => { setSelectedViewpoint(viewpoints[0].id); setPanoramaMetadata(null); setRoomChoices(Object.fromEntries(viewpoints.map((point) => [point.id, startEmpty ? "empty" : "original"]))); setScreen("overview"); setAnalysisError(""); }}
         />
       ) : (
         <ReadyProject
           screen={screen} selected={selected} selectedViewpoint={selectedViewpoint}
           isEntering={isEnteringTour} isPreparing={isPreparingTour} panoramaMetadata={panoramaMetadata}
-          onSelect={(id) => { setSelectedViewpoint(id); setPanoramaMetadata(null); }}
+          onSelect={(id) => { if (isEnteringTour || isPreparingTour) return; setSelectedViewpoint(id); setPanoramaMetadata(null); }}
           onTour={() => { void enterTour(); }} onOverview={() => { setScreen("overview"); setPanoramaMetadata(null); }}
           onMetadata={setPanoramaMetadata}
           roomChoices={roomChoices} startEmpty={startEmpty} onRoomChoice={(id, choice, itemId) => setRoomChoices((current) => ({ ...current, [id]: withFurnitureChoice(id, current[id] ?? "original", itemId, choice) }))}
@@ -254,7 +254,7 @@ function ReadyProject({ screen, selected, selectedViewpoint, isEntering, isPrepa
 
     <section className="canvas-panel project-canvas">
       <div className="canvas-toolbar"><div><span className="canvas-title">{screen === "tour" ? selected.name : "House overview"}</span><span className="canvas-status">{screen === "tour" ? "360° panorama · drag, look up or down, and zoom" : "Choose a point to preview its room"}</span></div><span className="resolution-pill">{screen === "tour" ? panoramaMetadata ? `${panoramaMetadata.width} × ${panoramaMetadata.height}` : "Loading texture" : "5 viewpoints"}</span></div>
-      {screen === "tour" ? <PanoramaViewer viewpoint={selected} viewpoints={viewpoints} panoramaUrl={panoramaFor(selected, roomChoices[selected.id])} choice={roomChoices[selected.id] ?? "original"} onChoiceChange={(choice, itemId) => onRoomChoice(selected.id, choice, itemId)} onViewpointChange={onSelect} onMetadata={onMetadata} /> : <div className={isEntering ? "overview-canvas entering-tour" : "overview-canvas"} style={{ "--focus-x": `${selected.planPosition.x}%`, "--focus-y": `${selected.planPosition.y}%` } as CSSProperties}>
+      {screen === "tour" ? <PanoramaViewer viewpoint={selected} viewpoints={viewpoints} panoramaUrl={panoramaFor(selected, roomChoices[selected.id])} choice={roomChoices[selected.id] ?? "original"} onChoiceChange={(choice, itemId) => onRoomChoice(selected.id, choice, itemId)} onViewpointChange={onSelect} onMetadata={onMetadata} onOverview={onOverview} /> : <div className={isEntering ? "overview-canvas entering-tour" : "overview-canvas"} style={{ "--focus-x": `${selected.planPosition.x}%`, "--focus-y": `${selected.planPosition.y}%` } as CSSProperties}>
         <NextImage className="overhead-image" src={startEmpty ? "/demo/furniture/apartment-overhead-empty.webp" : "/demo/apartment-overhead.png"} alt={`${startEmpty ? "Empty" : "Furnished"} overhead view of Cedar House`} width={1672} height={1000} unoptimized />
         <div className="transition-panorama" style={{ backgroundImage: `url(${panoramaFor(selected, roomChoices[selected.id])})` }} />
         <div className="transition-label"><MapPin size={16} /><span>Entering {selected.name}</span></div>
