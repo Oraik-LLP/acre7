@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import NextImage from "next/image";
 import {
@@ -49,15 +49,6 @@ const options: Record<ParameterKey, { label: string; swatch: string }[]> = {
   ],
 };
 const titles: Record<ParameterKey, string> = { walls: "Wall color", flooring: "Flooring", style: "Interior style", lighting: "Lighting" };
-function preloadImage(url: string) {
-  return new Promise<void>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve();
-    image.onerror = () => reject(new Error(`Unable to preload ${url}`));
-    image.src = url;
-  });
-}
-
 export function DesignerApp() {
   const transitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const transitionToken = useRef(0);
@@ -75,11 +66,14 @@ export function DesignerApp() {
   const [panoramaMetadata, setPanoramaMetadata] = useState<PanoramaMetadata | null>(null);
   const [isEnteringTour, setIsEnteringTour] = useState(false);
   const [isPreparingTour, setIsPreparingTour] = useState(false);
+  const [isPanoramaReady, setIsPanoramaReady] = useState(false);
+  const [isTourCentered, setIsTourCentered] = useState(false);
   const [startEmpty, setStartEmpty] = useState(false);
   const [roomChoices, setRoomChoices] = useState<Record<string, string>>({});
   const [parameters, setParameters] = useState<Record<ParameterKey, string>>({
     walls: "Warm white", flooring: "Oak wood", style: "Warm natural", lighting: "Natural daylight",
   });
+  const canvasRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     fetch("/api/provider-status")
@@ -106,6 +100,7 @@ export function DesignerApp() {
     transitionToken.current += 1;
     if (transitionTimer.current) clearTimeout(transitionTimer.current);
     setIsEnteringTour(false); setIsPreparingTour(false);
+    setIsPanoramaReady(false); setIsTourCentered(false);
   }
 
   function goToStep(index: number) {
@@ -116,7 +111,9 @@ export function DesignerApp() {
       setSelectedViewpoint(viewpoints[0].id);
       setRoomChoices(Object.fromEntries(viewpoints.map((point) => [point.id, startEmpty ? "empty" : "original"])));
     }
-    setPicker(null); setPanoramaMetadata(null); setScreen(target);
+    setPicker(null); setPanoramaMetadata(null);
+    if (target === "tour" && screen !== "tour") { setScreen("overview"); enterTour(); return; }
+    setScreen(target);
   }
 
   function openDemo() {
@@ -126,24 +123,36 @@ export function DesignerApp() {
     setScreen("demo-plan"); setAnalysisError("");
   }
 
-  async function enterTour() {
+  function enterTour() {
     if (isEnteringTour || isPreparingTour) return;
     const token = ++transitionToken.current;
+    setPanoramaMetadata(null); setIsPanoramaReady(false); setIsTourCentered(false);
     setIsPreparingTour(true);
-    try {
-      await preloadImage(panoramaFor(selected, roomChoices[selected.id]));
-    } catch {
-      // The WebGL viewer owns the visible load/error state and fallback.
-    }
-    if (token !== transitionToken.current) return;
-    setIsPreparingTour(false);
-    setIsEnteringTour(true);
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Center the visible overview while the actual WebGL scene warms behind it.
+    requestAnimationFrame(() => {
+      if (token !== transitionToken.current) return;
+      canvasRef.current?.scrollIntoView({ block: "center", behavior: reducedMotion ? "instant" : "smooth" });
+    });
     transitionTimer.current = setTimeout(() => {
       if (token !== transitionToken.current) return;
-      setScreen("tour"); setIsEnteringTour(false);
-    }, reducedMotion ? 100 : 1450);
+      setIsTourCentered(true);
+    }, reducedMotion ? 0 : 400);
   }
+
+  useEffect(() => {
+    if (!isPreparingTour || !isPanoramaReady || !isTourCentered) return;
+    const token = transitionToken.current;
+    queueMicrotask(() => {
+      if (token !== transitionToken.current) return;
+      setIsPreparingTour(false); setIsEnteringTour(true);
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      transitionTimer.current = setTimeout(() => {
+        if (token !== transitionToken.current) return;
+        setScreen("tour"); setIsEnteringTour(false);
+      }, reducedMotion ? 0 : 1500);
+    });
+  }, [isPreparingTour, isPanoramaReady, isTourCentered]);
 
   function acceptFile(nextFile?: File) {
     if (!nextFile || !nextFile.type.match(/^(image\/(png|jpeg)|application\/pdf)$/)) {
@@ -178,7 +187,7 @@ export function DesignerApp() {
   const selected = viewpoints.find((viewpoint) => viewpoint.id === selectedViewpoint) ?? viewpoints[0];
 
   return (
-    <main id="main-content" className={`app-shell screen-${screen}`}>
+    <main id="main-content" className={`app-shell screen-${screen}${isPreparingTour || isEnteringTour ? " is-opening-tour" : ""}`}>
       <header className="topbar">
         <Link className="brand" href="/" aria-label="Acre7 home"><span className="brand-mark"><NextImage src="/brand/acre7-mark.jpg" alt="" width={32} height={32} unoptimized /></span><span>acre<span className="brand-seven">7</span></span></Link>
         <div className="project-title"><span className="project-kicker">{screen === "source" ? "New project" : "Cedar House"}</span><span className="autosave"><span /> {screen === "source" ? "Plan review" : "Prepared demo"}</span></div>
@@ -213,6 +222,7 @@ export function DesignerApp() {
         <ReadyProject
           screen={screen} selected={selected} selectedViewpoint={selectedViewpoint}
           parameters={parameters}
+          canvasRef={canvasRef} onReady={setIsPanoramaReady}
           isEntering={isEnteringTour} isPreparing={isPreparingTour} panoramaMetadata={panoramaMetadata}
           onSelect={(id) => { if (isEnteringTour || isPreparingTour) return; setSelectedViewpoint(id); setPanoramaMetadata(null); }}
           onTour={() => { void enterTour(); }} onOverview={() => goToStep(3)}
@@ -282,14 +292,38 @@ function SourceWorkspace(props: SourceProps) {
   </section>;
 }
 
-function ReadyProject({ screen, selected, selectedViewpoint, parameters, isEntering, isPreparing, panoramaMetadata, roomChoices, startEmpty, onRoomChoice, onSelect, onTour, onOverview, onMetadata }: {
+function ReadyProject({ screen, selected, selectedViewpoint, parameters, canvasRef, onReady, isEntering, isPreparing, panoramaMetadata, roomChoices, startEmpty, onRoomChoice, onSelect, onTour, onOverview, onMetadata }: {
   screen: Screen; selected: Viewpoint; selectedViewpoint: string; isEntering: boolean; isPreparing: boolean;
   panoramaMetadata: PanoramaMetadata | null;
   parameters: Record<ParameterKey, string>;
+  canvasRef: { current: HTMLElement | null }; onReady: (ready: boolean) => void;
   roomChoices: Record<string, string>; startEmpty: boolean; onRoomChoice: (id: string, choice: string, itemId?: string) => void;
   onSelect: (id: string) => void; onTour: () => void; onOverview: () => void;
   onMetadata: (metadata: PanoramaMetadata | null) => void;
 }) {
+  const stageRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const stage = stageRef.current;
+    if (!stage || !isEntering || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const rect = stage.getBoundingClientRect();
+    const mobile = window.matchMedia("(max-width: 980px)").matches;
+    const shell = stage.closest(".app-shell");
+    const topbar = shell?.querySelector(".topbar")?.getBoundingClientRect().height ?? 0;
+    const steps = shell?.querySelector(".steps")?.getBoundingClientRect().height ?? 0;
+    const top = mobile ? topbar + steps : rect.top;
+    const footer = mobile ? 0 : (canvasRef.current?.querySelector(".canvas-footer")?.getBoundingClientRect().height ?? 0);
+    const target = { left: mobile ? 0 : rect.left, top, width: mobile ? window.innerWidth : rect.width, height: Math.max(200, window.innerHeight - top - footer) };
+    const previousStyle = stage.style.cssText;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    Object.assign(stage.style, { position: "fixed", zIndex: "40", left: `${target.left}px`, top: `${target.top}px`, width: `${target.width}px`, height: `${target.height}px` });
+    const expansion = stage.animate([
+      { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, borderRadius: "16px" },
+      { left: `${target.left}px`, top: `${target.top}px`, width: `${target.width}px`, height: `${target.height}px`, borderRadius: "0px" },
+    ], { duration: 460, easing: "cubic-bezier(.2,.7,.2,1)", fill: "both" });
+    return () => { expansion.cancel(); stage.style.cssText = previousStyle; document.body.style.overflow = previousOverflow; };
+  }, [isEntering, canvasRef]);
+
   return <section className="workspace ready-workspace">
     <aside className="control-panel project-panel">
       <div className="eyebrow"><Sparkles size={15} /> Cedar House</div>
@@ -299,18 +333,20 @@ function ReadyProject({ screen, selected, selectedViewpoint, parameters, isEnter
       {screen === "overview" && <p className="demo-sample-note">Your demo choices are shown above. These prepared images use the original warm natural palette.</p>}
       <div className="viewpoint-heading"><span>Viewpoints</span><small>5 / 5</small></div>
       <div className="viewpoint-list">{viewpoints.map((viewpoint) => <button type="button" key={viewpoint.id} aria-pressed={selectedViewpoint === viewpoint.id} className={selectedViewpoint === viewpoint.id ? "viewpoint-item selected" : "viewpoint-item"} onClick={() => onSelect(viewpoint.id)}><span className="viewpoint-thumb" style={{ backgroundImage: `url(${panoramaFor(viewpoint, roomChoices[viewpoint.id])})` }}><small>{viewpoint.index}</small></span><span><strong>{viewpoint.name}</strong><small>{viewpoint.roomLabel}</small></span><ChevronRight size={16} /></button>)}</div>
-      {screen === "tour" ? <Button variant="outline" className="primary-action tour-back" onClick={onOverview}><ArrowLeft /> Back to overview</Button> : <Button className="primary-action" size="lg" onClick={onTour} disabled={isEntering || isPreparing}>{isPreparing ? "Preparing panorama…" : isEntering ? "Entering…" : "Enter panoramic tour"} <ArrowRight /></Button>}
+      {screen === "tour" ? <Button variant="outline" className="primary-action tour-back" onClick={onOverview}><ArrowLeft /> Back to overview</Button> : <Button className="primary-action" size="lg" onClick={onTour} disabled={isEntering || isPreparing}>{isPreparing || isEntering ? `Opening ${selected.name}…` : "Enter panoramic tour"} <ArrowRight /></Button>}
     </aside>
 
-    <section className="canvas-panel project-canvas">
+    <section ref={canvasRef} className="canvas-panel project-canvas">
       <div className="canvas-toolbar"><div><span className="canvas-title">{screen === "tour" ? selected.name : "House overview"}</span><span className="canvas-status">{screen === "tour" ? "360° panorama · drag, look up or down, and zoom" : "Choose a point to preview its room"}</span></div><span className="resolution-pill">{screen === "tour" ? panoramaMetadata ? `${panoramaMetadata.width} × ${panoramaMetadata.height}` : "Loading texture" : "5 viewpoints"}</span></div>
-      {screen === "tour" ? <PanoramaViewer viewpoint={selected} viewpoints={viewpoints} panoramaUrl={panoramaFor(selected, roomChoices[selected.id])} choice={roomChoices[selected.id] ?? "original"} onChoiceChange={(choice, itemId) => onRoomChoice(selected.id, choice, itemId)} onViewpointChange={onSelect} onMetadata={onMetadata} onOverview={onOverview} /> : <div className={isEntering ? "overview-canvas entering-tour" : "overview-canvas"} style={{ "--focus-x": `${selected.planPosition.x}%`, "--focus-y": `${selected.planPosition.y}%` } as CSSProperties}>
+      <div ref={stageRef} className={`tour-stage${isPreparing ? " preparing-tour-stage" : ""}${isEntering ? " entering-tour-stage" : ""}`}>
+      {(screen === "tour" || isPreparing || isEntering) && <div className="tour-live-layer" aria-hidden={screen !== "tour"} inert={screen !== "tour"}><PanoramaViewer viewpoint={selected} viewpoints={viewpoints} panoramaUrl={panoramaFor(selected, roomChoices[selected.id])} choice={roomChoices[selected.id] ?? "original"} onChoiceChange={(choice, itemId) => onRoomChoice(selected.id, choice, itemId)} onViewpointChange={onSelect} onMetadata={onMetadata} onOverview={onOverview} onReady={onReady} isEntering={isEntering} /></div>}
+      {screen !== "tour" && <div className={isEntering ? "overview-canvas entering-tour" : "overview-canvas"} style={{ "--focus-x": `${selected.planPosition.x}%`, "--focus-y": `${selected.planPosition.y}%` } as CSSProperties}>
         <NextImage className="overhead-image" src={startEmpty ? "/demo/furniture/apartment-overhead-empty.webp" : "/demo/apartment-overhead.png"} alt={`${startEmpty ? "Empty" : "Furnished"} overhead view of Cedar House`} width={1672} height={1000} unoptimized />
-        <div className="transition-panorama" style={{ backgroundImage: `url(${panoramaFor(selected, roomChoices[selected.id])})` }} />
         <div className="transition-label"><MapPin size={16} /><span>Entering {selected.name}</span></div>
         {viewpoints.map((viewpoint) => <button type="button" aria-label={`Open ${viewpoint.name}`} title={viewpoint.name} key={viewpoint.id} className={selectedViewpoint === viewpoint.id ? "map-point active" : "map-point"} style={{ left: `${viewpoint.planPosition.x}%`, top: `${viewpoint.planPosition.y}%` }} onClick={() => onSelect(viewpoint.id)} disabled={isEntering || isPreparing}><span>{viewpoint.index}</span></button>)}
-        <div className="overview-caption"><span className="viewpoint-index">{selected.index}</span><div><strong>{selected.name}</strong><small>{selected.roomLabel}</small></div><button type="button" onClick={onTour} disabled={isEntering || isPreparing}>{isPreparing ? "Preparing…" : isEntering ? "Entering…" : "Open view"} <ArrowRight size={14} /></button></div>
+        <div className="overview-caption"><span className="viewpoint-index">{selected.index}</span><div><strong>{selected.name}</strong><small>{selected.roomLabel}</small></div><button type="button" onClick={onTour} disabled={isEntering || isPreparing}>{isPreparing || isEntering ? "Opening…" : "Open view"} <ArrowRight size={14} /></button></div>
       </div>}
+      </div>
       <div className="canvas-footer"><span>{screen === "tour" ? "Use the viewpoint list to move between rooms." : "Select any numbered point to choose where the tour begins."}</span><span className="provider-note">Cedar House · Warm natural</span></div>
     </section>
   </section>;

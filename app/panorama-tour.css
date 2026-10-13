@@ -1,5 +1,36 @@
 /* The photograph is the presentation; controls stay along its edges. */
 .panorama-viewport { animation: none; isolation: isolate; }
+.tour-stage { position: relative; flex: 1; min-height: 0; width: 100%; overflow: hidden; background: #090b0a; }
+.tour-stage:has(.is-expanded) { overflow: visible; z-index: 100; }
+.tour-stage > .overview-canvas, .tour-live-layer { position: absolute; inset: 0; width: 100%; height: 100%; }
+.tour-stage > .overview-canvas { z-index: 2; }
+.tour-live-layer { z-index: 1; }
+.tour-live-layer .panorama-viewport { height: 100%; }
+.preparing-tour-stage .tour-live-layer { visibility: hidden; }
+.entering-tour-stage .overview-canvas { animation: tour-overview-reveal 1500ms ease both; pointer-events: none; }
+.entering-tour-stage .overhead-image { animation: tour-room-dive 1500ms cubic-bezier(.3,.65,.15,1) both; }
+.entering-tour-stage .transition-label { animation: tour-destination 1500ms ease both; }
+.entering-tour-stage .tour-topline, .entering-tour-stage .tour-tools, .entering-tour-stage .tour-navigation, .entering-tour-stage .furniture-trigger, .entering-tour-stage .furniture-hotspot, .entering-tour-stage .furniture-selection-layer, .entering-tour-stage .panorama-hotspot { animation: tour-controls-arrive 1500ms ease both; }
+.is-opening-tour .demo-flow-nav { opacity: 0; pointer-events: none; transform: translate(-50%, 16px); transition: opacity 200ms ease, transform 200ms ease; }
+.is-opening-tour .project-panel { opacity: .45; transition: opacity 300ms ease; }
+.screen-tour .ready-workspace { min-height: 0; }
+@keyframes tour-room-dive {
+  0% { transform: scale(1); filter: none; }
+  45% { opacity: 1; }
+  78% { transform: scale(5.5); filter: blur(3px); opacity: .3; }
+  100% { transform: scale(6); filter: blur(3px); opacity: 0; }
+}
+@keyframes tour-overview-reveal { 0%, 35% { opacity: 1; } 88%, 100% { opacity: 0; } }
+@keyframes tour-destination {
+  0% { opacity: 0; transform: translate(-50%,-50%) scale(.95); }
+  20%, 48% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  75%, 100% { opacity: 0; transform: translate(-50%,-50%) scale(1); }
+}
+@keyframes tour-controls-arrive { 0%, 72% { opacity: 0; } 100% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .entering-tour-stage .overview-canvas, .entering-tour-stage .overhead-image, .entering-tour-stage .transition-label, .entering-tour-stage .tour-topline, .entering-tour-stage .tour-tools, .entering-tour-stage .tour-navigation, .entering-tour-stage .furniture-trigger, .entering-tour-stage .furniture-hotspot, .entering-tour-stage .furniture-selection-layer, .entering-tour-stage .panorama-hotspot { animation: none; }
+  .is-opening-tour .demo-flow-nav, .is-opening-tour .project-panel { transition: none; }
+}
 .panorama-viewport.is-expanded { position: fixed; inset: 0; z-index: 100; width: 100%; height: 100dvh; min-height: 0; }
 .tour-reticle { display: none; }
 .tour-topline { position: absolute; z-index: 7; top: max(16px, env(safe-area-inset-top)); left: max(16px, env(safe-area-inset-left)); display: flex; align-items: flex-start; gap: 8px; }

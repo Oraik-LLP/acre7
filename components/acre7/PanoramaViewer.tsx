@@ -22,6 +22,8 @@ type PanoramaViewerProps = {
   choice: string;
   onChoiceChange: (choice: string, itemId?: string) => void;
   onOverview: () => void;
+  onReady?: (ready: boolean) => void;
+  isEntering?: boolean;
 };
 
 type Orientation = {
@@ -61,7 +63,7 @@ function pointerDistance(points: Map<number, { x: number; y: number }>) {
   return Math.hypot(second.x - first.x, second.y - first.y);
 }
 
-export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onChoiceChange, onViewpointChange, onMetadata, onOverview }: PanoramaViewerProps) {
+export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onChoiceChange, onViewpointChange, onMetadata, onOverview, onReady, isEntering = false }: PanoramaViewerProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -114,6 +116,14 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
   const currentIndex = viewpoints.findIndex((candidate) => candidate.id === viewpoint.id);
   const previousIndex = adjacentViewpointIndex(currentIndex, -1, viewpoints.length);
   const nextIndex = adjacentViewpointIndex(currentIndex, 1, viewpoints.length);
+
+  useEffect(() => { onReady?.(status !== "loading"); }, [onReady, status]);
+
+  useEffect(() => {
+    if (!isEntering || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    orientationRef.current.fov = Math.min(maxFov, viewpoint.initialFov + 14);
+    orientationRef.current.targetFov = viewpoint.initialFov;
+  }, [isEntering, viewpoint.initialFov]);
 
   useEffect(() => {
     if (!isExpanded) return;
@@ -547,6 +557,9 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
         material.map = texture;
         material.needsUpdate = true;
       }
+      // Upload the texture and draw the real sphere before the overview reveals
+      // this canvas, so entry never hands off to a cold renderer or a flat photo.
+      if (sceneRef.current && cameraRef.current) renderer.render(sceneRef.current, cameraRef.current);
       setStatus("ready");
       onMetadata(metadata);
 
@@ -673,7 +686,7 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
 
     {editing && <section ref={editorRef} tabIndex={-1} role="dialog" className="furniture-editor" aria-label="Furniture editing controls" onPointerDown={(event) => event.stopPropagation()}>
       <div className="furniture-editor-head"><div><small>{isEmpty ? "EMPTY ROOM" : "SELECTED OBJECT"}</small><strong>{isEmpty ? viewpoint.name : activeItem?.name ?? "Choose a piece"}</strong></div><button type="button" aria-label="Close furniture editor" onClick={() => setEditing(false)}><X size={18} /></button></div>
-      {!isEmpty && items.length > 1 && <div className="furniture-object-list">{items.map((item) => <button type="button" key={item.id} className={activeItem?.id === item.id ? "selected" : ""} onClick={() => { setActiveItem(item); orientationRef.current.targetYaw = item.bearing; }}>{item.name}</button>)}</div>}
+      {!isEmpty && items.length > 1 && <div className="furniture-object-list">{items.map((item) => <button type="button" key={item.id} className={activeItem?.id === item.id ? "selected" : ""} onClick={() => { setActiveItem(item); orientationRef.current.targetYaw = orientationRef.current.yaw + normalizeDegrees(item.bearing - orientationRef.current.yaw); }}>{item.name}</button>)}</div>}
       <div className="furniture-tabs" role="tablist" aria-label="Furniture input">{([ ["suggest","✨ Suggest"], ["inventory","Inventory"], ["reference","Image"], ["describe","Text"] ] as const).map(([id,label]) => <button type="button" key={id} role="tab" aria-selected={editTab === id} className={editTab === id ? "selected" : ""} onClick={() => setEditTab(id)}>{label}</button>)}</div>
       {editTab === "inventory" && !isEmpty && activeItem ? <div className="furniture-options">{activeItem.choices.map((option) => <button type="button" key={option.id} className={selectedFurnitureChoice(viewpoint.id, choice, activeItem.id) === option.id ? "selected" : ""} onClick={() => { onChoiceChange(option.id, activeItem.id); setEditMessage(`${option.label} preview applied.`); }}><Image src={option.image} alt="" width={140} height={96} unoptimized /><span><strong>{option.label}</strong><small>{option.hint}</small></span></button>)}</div> : null}
       {editTab === "reference" && <label className="furniture-reference"><ImagePlus size={19} /><span>{referenceName || "Choose a furniture reference image"}</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { setReferenceName(event.target.files?.[0]?.name ?? ""); setEditMessage("Reference selected. Open Inventory to choose the closest prepared option."); }} /></label>}

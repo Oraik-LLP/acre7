@@ -17,7 +17,7 @@ const viewpointSeeds: ViewpointSeed[] = [
     expectedHeight: 887,
     initialYaw: -170,
     initialPitch: -8,
-    initialFov: 72,
+    initialFov: 80,
     neighbourIds: ["view_dining", "view_primary"],
   },
   {
@@ -33,7 +33,7 @@ const viewpointSeeds: ViewpointSeed[] = [
     expectedHeight: 887,
     initialYaw: -90,
     initialPitch: -8,
-    initialFov: 72,
+    initialFov: 80,
     neighbourIds: ["view_living", "view_kitchen", "view_guest"],
   },
   {
@@ -49,7 +49,7 @@ const viewpointSeeds: ViewpointSeed[] = [
     expectedHeight: 887,
     initialYaw: -90,
     initialPitch: -8,
-    initialFov: 72,
+    initialFov: 80,
     neighbourIds: ["view_dining", "view_guest"],
   },
   {
@@ -65,7 +65,7 @@ const viewpointSeeds: ViewpointSeed[] = [
     expectedHeight: 887,
     initialYaw: -90,
     initialPitch: -8,
-    initialFov: 72,
+    initialFov: 80,
     neighbourIds: ["view_living", "view_guest"],
   },
   {
@@ -81,7 +81,7 @@ const viewpointSeeds: ViewpointSeed[] = [
     expectedHeight: 887,
     initialYaw: -90,
     initialPitch: -8,
-    initialFov: 72,
+    initialFov: 80,
     neighbourIds: ["view_dining", "view_kitchen", "view_primary"],
   },
 ];
