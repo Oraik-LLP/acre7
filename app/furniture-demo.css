@@ -1,4 +1,4 @@
-.empty-room-choice{display:flex;align-items:flex-start;gap:12px;margin:8px 0 22px;padding:15px;border:1px solid var(--border,#d7ded2);border-radius:15px;background:var(--surface,#f7f8f3);cursor:pointer}
+.empty-room-choice{display:flex;align-items:flex-start;gap:12px;margin:8px 0 22px;padding:15px;border:1px solid var(--border);border-radius:15px;background:var(--card);color:var(--card-foreground);cursor:pointer}
 .empty-room-choice input{width:19px;height:19px;flex:none;margin:2px 0 0;accent-color:#819f25}
 .empty-room-choice span{display:grid;gap:3px}.empty-room-choice strong{font-size:13px}.empty-room-choice small{line-height:1.45;font-size:11px;opacity:.72}
 .furniture-trigger{position:absolute;z-index:7;right:20px;bottom:21px;display:flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border:1px solid rgba(255,255,255,.3);border-radius:999px;background:#d8fa75;color:#182017;font-size:12px;font-weight:800;box-shadow:0 8px 25px #0005;transition:transform .2s,box-shadow .2s}

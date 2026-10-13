@@ -18,9 +18,11 @@ import { SiteFooter, SiteHeader } from "@/components/acre7/SiteChrome";
 import { ThemeToggle } from "@/components/acre7/ThemeToggle";
 import { ScrollSpatialStory } from "@/components/acre7/ScrollSpatialStory";
 import { panoramaFor, withFurnitureChoice } from "@/lib/acre7/furniture-demo";
+import { DemoWorkflow, DemoStepNavigation, demoStepLabels } from "@/components/acre7/DemoWorkflow";
 
 type ParameterKey = "walls" | "flooring" | "style" | "lighting";
-type Screen = "source" | "overview" | "tour";
+type Screen = "source" | "demo-plan" | "demo-materials" | "demo-viewpoints" | "overview" | "tour";
+const demoScreens: Screen[] = ["demo-plan", "demo-materials", "demo-viewpoints", "overview", "tour"];
 
 const options: Record<ParameterKey, { label: string; swatch: string }[]> = {
   walls: [
@@ -58,6 +60,8 @@ function preloadImage(url: string) {
 
 export function DesignerApp() {
   const transitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const transitionToken = useRef(0);
+  const stepsRef = useRef<HTMLElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [picker, setPicker] = useState<ParameterKey | null>(null);
@@ -83,21 +87,60 @@ export function DesignerApp() {
       .then(setProviders)
       .catch(() => setProviders(null));
     viewpoints.forEach((viewpoint) => { const image = new Image(); image.src = viewpoint.panoramaUrl; });
-    return () => { if (transitionTimer.current) clearTimeout(transitionTimer.current); };
+    const query = new URLSearchParams(window.location.search);
+    const linkedViewpoint = viewpoints.find((point) => point.id === query.get("viewpoint"));
+    if (query.get("demo") === "1" || linkedViewpoint) queueMicrotask(() => {
+      setRoomChoices(Object.fromEntries(viewpoints.map((point) => [point.id, "original"])));
+      setSelectedViewpoint(linkedViewpoint?.id ?? viewpoints[0].id);
+      setScreen(linkedViewpoint ? "tour" : "demo-plan");
+    });
+    return () => { transitionToken.current += 1; if (transitionTimer.current) clearTimeout(transitionTimer.current); };
   }, []);
+
+  const activeStep = screen === "source" ? 0 : demoScreens.indexOf(screen);
+  useEffect(() => {
+    stepsRef.current?.querySelector('[aria-current="step"]')?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [activeStep]);
+
+  function cancelTourEntry() {
+    transitionToken.current += 1;
+    if (transitionTimer.current) clearTimeout(transitionTimer.current);
+    setIsEnteringTour(false); setIsPreparingTour(false);
+  }
+
+  function goToStep(index: number) {
+    const target = demoScreens[index];
+    if (!target) return;
+    cancelTourEntry();
+    if (screen === "source") {
+      setSelectedViewpoint(viewpoints[0].id);
+      setRoomChoices(Object.fromEntries(viewpoints.map((point) => [point.id, startEmpty ? "empty" : "original"])));
+    }
+    setPicker(null); setPanoramaMetadata(null); setScreen(target);
+  }
+
+  function openDemo() {
+    cancelTourEntry();
+    setSelectedViewpoint(viewpoints[0].id); setPanoramaMetadata(null);
+    setRoomChoices(Object.fromEntries(viewpoints.map((point) => [point.id, startEmpty ? "empty" : "original"])));
+    setScreen("demo-plan"); setAnalysisError("");
+  }
 
   async function enterTour() {
     if (isEnteringTour || isPreparingTour) return;
+    const token = ++transitionToken.current;
     setIsPreparingTour(true);
     try {
       await preloadImage(panoramaFor(selected, roomChoices[selected.id]));
     } catch {
       // The WebGL viewer owns the visible load/error state and fallback.
     }
+    if (token !== transitionToken.current) return;
     setIsPreparingTour(false);
     setIsEnteringTour(true);
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     transitionTimer.current = setTimeout(() => {
+      if (token !== transitionToken.current) return;
       setScreen("tour"); setIsEnteringTour(false);
     }, reducedMotion ? 100 : 1450);
   }
@@ -132,7 +175,6 @@ export function DesignerApp() {
     } finally { setIsAnalyzing(false); }
   }
 
-  const activeStep = screen === "source" ? 0 : screen === "overview" ? 3 : 4;
   const selected = viewpoints.find((viewpoint) => viewpoint.id === selectedViewpoint) ?? viewpoints[0];
 
   return (
@@ -149,11 +191,11 @@ export function DesignerApp() {
         </div>
       </header>
 
-      <nav className="steps" aria-label="Project progress">
-        {["Plan", "Materials", "Viewpoints", "Generate", "Tour"].map((step, index) => (
-          <div className={index === activeStep ? "step active" : index < activeStep ? "step complete" : "step"} key={step}>
+      <nav ref={stepsRef} className="steps" aria-label="Project progress">
+        {demoStepLabels.map((step, index) => (
+          <button type="button" aria-current={index === activeStep ? "step" : undefined} onClick={() => goToStep(index)} className={index === activeStep ? "step active" : index < activeStep ? "step complete" : "step"} key={step}>
             <span className="step-number">{index < activeStep ? <Check size={13} /> : index + 1}</span><span>{step}</span>
-          </div>
+          </button>
         ))}
       </nav>
 
@@ -162,17 +204,23 @@ export function DesignerApp() {
           file={file} preview={preview} analysis={analysis} analysisError={analysisError} isAnalyzing={isAnalyzing} analysisEnabled={providers?.analysisEnabled ?? false}
           parameters={parameters} instructions={instructions} startEmpty={startEmpty} onStartEmpty={setStartEmpty}
           onFile={acceptFile} onInstructions={setInstructions} onPicker={setPicker} onAnalyze={analyze}
-          onOpenReady={() => { setSelectedViewpoint(viewpoints[0].id); setPanoramaMetadata(null); setRoomChoices(Object.fromEntries(viewpoints.map((point) => [point.id, startEmpty ? "empty" : "original"]))); setScreen("overview"); setAnalysisError(""); }}
+          onOpenReady={openDemo}
         />
+      ) : activeStep < 3 ? (
+        <DemoWorkflow step={activeStep} parameters={parameters} options={options} onParameter={(key, value) => setParameters((current) => ({ ...current, [key]: value }))} selectedId={selectedViewpoint} onSelect={setSelectedViewpoint} startEmpty={startEmpty} onStartEmpty={(empty) => { setStartEmpty(empty); setRoomChoices(Object.fromEntries(viewpoints.map((point) => [point.id, empty ? "empty" : "original"]))); }} onStep={goToStep} onExit={() => { cancelTourEntry(); setScreen("source"); }} />
       ) : (
+        <>
         <ReadyProject
           screen={screen} selected={selected} selectedViewpoint={selectedViewpoint}
+          parameters={parameters}
           isEntering={isEnteringTour} isPreparing={isPreparingTour} panoramaMetadata={panoramaMetadata}
           onSelect={(id) => { if (isEnteringTour || isPreparingTour) return; setSelectedViewpoint(id); setPanoramaMetadata(null); }}
-          onTour={() => { void enterTour(); }} onOverview={() => { setScreen("overview"); setPanoramaMetadata(null); }}
+          onTour={() => { void enterTour(); }} onOverview={() => goToStep(3)}
           onMetadata={setPanoramaMetadata}
           roomChoices={roomChoices} startEmpty={startEmpty} onRoomChoice={(id, choice, itemId) => setRoomChoices((current) => ({ ...current, [id]: withFurnitureChoice(id, current[id] ?? "original", itemId, choice) }))}
         />
+        {screen === "overview" && <DemoStepNavigation step={3} onStep={goToStep} />}
+        </>
       )}
 
       <Dialog open={picker !== null} onOpenChange={(open) => !open && setPicker(null)}>
@@ -234,9 +282,10 @@ function SourceWorkspace(props: SourceProps) {
   </section>;
 }
 
-function ReadyProject({ screen, selected, selectedViewpoint, isEntering, isPreparing, panoramaMetadata, roomChoices, startEmpty, onRoomChoice, onSelect, onTour, onOverview, onMetadata }: {
+function ReadyProject({ screen, selected, selectedViewpoint, parameters, isEntering, isPreparing, panoramaMetadata, roomChoices, startEmpty, onRoomChoice, onSelect, onTour, onOverview, onMetadata }: {
   screen: Screen; selected: Viewpoint; selectedViewpoint: string; isEntering: boolean; isPreparing: boolean;
   panoramaMetadata: PanoramaMetadata | null;
+  parameters: Record<ParameterKey, string>;
   roomChoices: Record<string, string>; startEmpty: boolean; onRoomChoice: (id: string, choice: string, itemId?: string) => void;
   onSelect: (id: string) => void; onTour: () => void; onOverview: () => void;
   onMetadata: (metadata: PanoramaMetadata | null) => void;
@@ -246,7 +295,8 @@ function ReadyProject({ screen, selected, selectedViewpoint, isEntering, isPrepa
       <div className="eyebrow"><Sparkles size={15} /> Cedar House</div>
       <h1>{screen === "tour" ? selected.name : "Your home, from every angle."}</h1>
       <p className="intro">{screen === "tour" ? `${selected.roomLabel} · Viewpoint ${selected.index} of 5` : "Five positions connect the overview to an immersive room-by-room tour."}</p>
-      <div className="project-spec"><span><small>Walls</small>Warm white</span><span><small>Floor</small>Oak wood</span><span><small>Style</small>Warm natural</span><span><small>Light</small>Daylight</span></div>
+      <div className="project-spec"><span><small>Walls</small>{parameters.walls}</span><span><small>Floor</small>{parameters.flooring}</span><span><small>Style</small>{parameters.style}</span><span><small>Light</small>{parameters.lighting}</span></div>
+      {screen === "overview" && <p className="demo-sample-note">Your demo choices are shown above. These prepared images use the original warm natural palette.</p>}
       <div className="viewpoint-heading"><span>Viewpoints</span><small>5 / 5</small></div>
       <div className="viewpoint-list">{viewpoints.map((viewpoint) => <button type="button" key={viewpoint.id} aria-pressed={selectedViewpoint === viewpoint.id} className={selectedViewpoint === viewpoint.id ? "viewpoint-item selected" : "viewpoint-item"} onClick={() => onSelect(viewpoint.id)}><span className="viewpoint-thumb" style={{ backgroundImage: `url(${panoramaFor(viewpoint, roomChoices[viewpoint.id])})` }}><small>{viewpoint.index}</small></span><span><strong>{viewpoint.name}</strong><small>{viewpoint.roomLabel}</small></span><ChevronRight size={16} /></button>)}</div>
       {screen === "tour" ? <Button variant="outline" className="primary-action tour-back" onClick={onOverview}><ArrowLeft /> Back to overview</Button> : <Button className="primary-action" size="lg" onClick={onTour} disabled={isEntering || isPreparing}>{isPreparing ? "Preparing panorama…" : isEntering ? "Entering…" : "Enter panoramic tour"} <ArrowRight /></Button>}

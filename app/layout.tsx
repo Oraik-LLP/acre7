@@ -4,6 +4,7 @@ import "./globals.css";
 import "./acre7-enhancements.css";
 import "./furniture-demo.css";
 import "./panorama-tour.css";
+import "./demo-flow.css";
 
 export const metadata: Metadata = {
   title: "Acre7 — See the house before the walls are finished",

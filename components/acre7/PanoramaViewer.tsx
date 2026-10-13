@@ -707,7 +707,7 @@ export function PanoramaViewer({ viewpoint, viewpoints, panoramaUrl, choice, onC
       <p className="tour-gesture-hint"><Move size={14} /><span>{motion.status === "on" ? "Move your phone to look around" : "Drag to look · Pinch or scroll to zoom"}</span><span ref={headingRef} className="tour-heading">0°</span></p>
       <nav className="tour-room-nav" aria-label="Room navigation">
         <button type="button" aria-label="Previous room" disabled={previousIndex === null} onClick={() => { if (previousIndex !== null) onViewpointChange(viewpoints[previousIndex].id); }}><ChevronLeft size={20} /><span>Previous</span></button>
-        <span className="tour-room-count" aria-live="polite">{currentIndex + 1}<span> / {viewpoints.length}</span></span>
+        <span className="tour-room-count" aria-live="polite"><strong>{viewpoint.name}</strong><span>Room {currentIndex + 1} of {viewpoints.length}</span></span>
         <button type="button" aria-label="Next room" disabled={nextIndex === null} onClick={() => { if (nextIndex !== null) onViewpointChange(viewpoints[nextIndex].id); }}><span>Next</span><ChevronRight size={20} /></button>
       </nav>
     </div>
